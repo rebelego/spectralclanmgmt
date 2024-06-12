@@ -22,7 +22,7 @@ import java.util.*;
 @Slf4j
 @PluginDescriptor(
 name = "Spectral Clan Mgmt",
-description = "A member management plugin for the OSRS Spectral clan's Admin ranks only."
+description = "A Runelite plugin to help the OSRS Spectral clan's Admin ranks perform their management duties."
 )
 public class SpectralClanMgmtPlugin extends Plugin
 {
@@ -143,6 +143,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 				i++;
 			}
 			
+			// We get the join date converted to be in the EST/EDT timezone 
+			// and add that along with the member's name to the memberJoinDates hashmap.
 			for (ClanMember cm : clanMembers)
 			{
 				String joinDate = convertJoinDate(cm);
@@ -159,7 +161,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		long joined = member.getJoinDate().atStartOfDay(ZoneId.of("Europe/Belfast")).toEpochSecond() * 1000L;
 		ZonedDateTime convertedJoinDate = Instant.ofEpochMilli(joined).atZone(ZoneId.of("America/New_York"));
 		String spectralJoinDate = convertedJoinDate.format(DateTimeFormatter.ofPattern("M/d/uuuu"));
-		System.out.println("Name: " + member.getName() + ", Join Date: " + spectralJoinDate);
 		
 		return spectralJoinDate;
 	}
