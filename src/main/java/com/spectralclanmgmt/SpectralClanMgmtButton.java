@@ -35,10 +35,9 @@ public class SpectralClanMgmtButton
 	private final List<Widget> cornersAndEdges = new ArrayList<>();
 	private Widget textWidget;
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
-	private HashMap<Integer, Integer> clanmemberIndexes = new HashMap<Integer, Integer>();
-	private HashMap<String, Integer> clanmemberJoinDates = new HashMap<String, Integer>();
+	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
 	
-	public SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, Integer> memberJoinDates, HashMap<Integer, Integer> memberIndexes, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin)
+	public SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
@@ -46,7 +45,6 @@ public class SpectralClanMgmtButton
 		this.parent = client.getWidget(parent);
 		this.clanmembers = members;
 		this.clanmemberJoinDates = memberJoinDates;
-		this.clanmemberIndexes = memberIndexes;
 		this.clanSettings = clanSettings;
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
 		
@@ -409,67 +407,59 @@ public class SpectralClanMgmtButton
 			if (newMemberSelected == false)
 			{
 				// j is for the position of the child widget in the children array. 
-				// sn is the calculated index value of the slot number in the clanMemberIndexes hashmap.
+				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
 				// So if j = 1, then sn will be 0. If j = 7, sn will be 2.
 				int sn = (j - 1) / 3;
 				
-				// The slotNumber is the key for the selected member's name value in the clanmembers hashmap.
-				// I had to do it this way because the members are loaded into the members list widget in alphabetical order,
-				// but when you call the getMembers method in ClanSettings, they're put into the hashmap in the order they joined the clan.
-				// So the slot number maps the selected widget's position back to the name displayed on the widget,
-				// except I don't have to deal with as most of the problematic characters that get introduced in the name from the widget.
-				int slotNumber = clanmemberIndexes.get(sn);
-				
-				// With the slot number, we get the selected member's name and store it in the variable for use later.
-				String selectedNewMemberName = clanmembers.get(slotNumber);
-				String selectedNewMemberDate = "";
-				
-				if (this.clanmemberJoinDates != null)
+				if (clanmembers != null)
 				{
-					if (this.clanmemberJoinDates.size() > 0)
+					if (clanmembers.size() > 0)
 					{
-						// With the selected member's name, we get the selected member's int join date and convert it to the date format we want.
-						int joinDate = this.clanmemberJoinDates.get(selectedNewMemberName);
-						long jDate = (((long)joinDate + 11745L) * 86400000L);
-						ZonedDateTime jdna = Instant.ofEpochMilli(jDate).atZone(ZoneId.of("America/New_York"));
-						
-						// The converted int date value is stored in the variable for use later.
-						selectedNewMemberDate = jdna.format(DateTimeFormatter.ofPattern("M/d/uuuu"));
+						if (clanmemberJoinDates != null)
+						{
+							if (clanmemberJoinDates.size() > 0)
+							{
+								// With the slot number, we get the selected member's name, 
+								// and with the member's name we get their join date and store it in these variables for later.
+								String selectedNewMemberName = clanmembers.get(sn);
+								String selectedNewMemberDate = clanmemberJoinDates.get(selectedNewMemberName);
+								
+								if (selectedNewMemberName != "" && selectedNewMemberDate != "")
+								{
+									int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
+									
+									if (mainMemberRank != 9 && mainMemberRank != -1)
+									{
+										// Flip the flag and set the local variable values to their corresponding global variables.
+										newMemberSelected = true;
+										newMemberName = selectedNewMemberName;
+										newMemberDate = selectedNewMemberDate;
+										// Proceed to the next step.
+										confirmSelection();
+									}
+									else if (mainMemberRank == 9)
+									{
+										// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
+										task = "invalid-new";
+										newMemberName = selectedNewMemberName;
+										newMemberSelected = false;
+										newMemberDate = "";
+										// Proceed to the next step.
+										confirmSelection();
+									}
+								}
+								else
+								{
+									task = "error";
+									newMemberSelected = false;
+									newMemberName = "";
+									newMemberDate = "";
+									// Proceed to the next step.
+									confirmSelection();
+								}
+							}
+						}
 					}
-				}
-				
-				if (selectedNewMemberName != "" && selectedNewMemberDate != "")
-				{
-					int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
-					
-					if (mainMemberRank != 9 && mainMemberRank != -1)
-					{
-						// Flip the flag and set the local variable values to their corresponding global variables.
-						newMemberSelected = true;
-						newMemberName = selectedNewMemberName;
-						newMemberDate = selectedNewMemberDate;
-						// Proceed to the next step.
-						confirmSelection();
-					}
-					else if (mainMemberRank == 9)
-					{
-						// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
-						task = "invalid-new";
-						newMemberName = selectedNewMemberName;
-						newMemberSelected = false;
-						newMemberDate = "";
-						// Proceed to the next step.
-						confirmSelection();
-					}
-				}
-				else
-				{
-					task = "error";
-					newMemberSelected = false;
-					newMemberName = "";
-					newMemberDate = "";
-					// Proceed to the next step.
-					confirmSelection();
 				}
 			}
 		}
@@ -479,59 +469,61 @@ public class SpectralClanMgmtButton
 			if (altMemberSelected == false)
 			{
 				int sn = (j - 1) / 3;
-				int slotNumber = clanmemberIndexes.get(sn);
 				
-				String selectedNewMemberName = clanmembers.get(slotNumber);
-				String selectedNewMemberDate = "";
-				
-				if (this.clanmemberJoinDates != null)
+				if (clanmembers != null)
 				{
-					if (this.clanmemberJoinDates.size() > 0)
+					if (clanmembers.size() > 0)
 					{
-						int joinDate = this.clanmemberJoinDates.get(selectedNewMemberName);
-						long jDate = (((long)joinDate + 11745L) * 86400000L);
-						ZonedDateTime jdna = Instant.ofEpochMilli(jDate).atZone(ZoneId.of("America/New_York"));
-						selectedNewMemberDate = jdna.format(DateTimeFormatter.ofPattern("M/d/uuuu"));
+						if (clanmemberJoinDates != null)
+						{
+							if (clanmemberJoinDates.size() > 0)
+							{
+								// With the slot number, we get the selected member's name, 
+								// and with the member's name we get their join date and store it in these variables for later.
+								String selectedNewMemberName = clanmembers.get(sn);
+								String selectedNewMemberDate = clanmemberJoinDates.get(selectedNewMemberName);
+								
+								if (selectedNewMemberName != "" && selectedNewMemberDate != "")
+								{
+									// Make sure the selected member's rank is the Alt rank (Gnome Child), because Alt member accounts have to have that rank.
+									int altMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
+									
+									// Selected member has the Alt rank, we can proceed.
+									if (altMemberRank == 9)
+									{
+										// Flip the flag and set the local variable values to their corresponding global variables.
+										altMemberSelected = true;
+										altMemberName = selectedNewMemberName;
+										altMemberDate = selectedNewMemberDate;
+										confirmSelection();
+									}
+									else if (altMemberRank != 9)
+									{
+										// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
+										// This occurs if the admin selected a member that has a normal rank, which is a no-no for alts.
+										task = "invalid-alt";
+										// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
+										// but we want the selected name for the error message that's shown.
+										altMemberName = selectedNewMemberName;
+										altMemberSelected = false;
+										altMemberDate = "";
+										// Proceed to the next step.
+										confirmSelection();
+									}
+								}
+								else
+								{
+									// Just in case something else fucks up
+									task = "error";
+									altMemberSelected = false;
+									altMemberName = "";
+									altMemberDate = "";
+									// Proceed to the next step.
+									confirmSelection();
+								}
+							}
+						}
 					}
-				}
-				
-				if (selectedNewMemberName != "" && selectedNewMemberDate != "")
-				{
-					// Make sure the selected member's rank is the Alt rank (Gnome Child), because Alt member accounts have to have that rank.
-					int altMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
-					
-					// Selected member has the Alt rank, we can proceed.
-					if (altMemberRank == 9)
-					{
-						// Flip the flag and set the local variable values to their corresponding global variables.
-						altMemberSelected = true;
-						altMemberName = selectedNewMemberName;
-						altMemberDate = selectedNewMemberDate;
-						confirmSelection();
-					}
-					else if (altMemberRank != 9)
-					{
-						// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
-						// This occurs if the admin selected a member that has a normal rank, which is a no-no for alts.
-						task = "invalid-alt";
-						// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
-						// but we want the selected name for the error message that's shown.
-						altMemberName = selectedNewMemberName;
-						altMemberSelected = false;
-						altMemberDate = "";
-						// Proceed to the next step.
-						confirmSelection();
-					}
-				}
-				else
-				{
-					// Just in case something else fucks up
-					task = "error";
-					altMemberSelected = false;
-					altMemberName = "";
-					altMemberDate = "";
-					// Proceed to the next step.
-					confirmSelection();
 				}
 			}
 		}
@@ -541,10 +533,9 @@ public class SpectralClanMgmtButton
 			if (altMemberSelected == true && mainMemberSelected == false)
 			{
 				int sn = (j - 1) / 3;
-				int slotNumber = clanmemberIndexes.get(sn);
 				
 				// For selecting an alt's main, we only want to get the name and store it in a local variable.
-				String selectedMainMemberName = clanmembers.get(slotNumber);
+				String selectedMainMemberName = clanmembers.get(sn);
 				
 				if (selectedMainMemberName != "")
 				{
