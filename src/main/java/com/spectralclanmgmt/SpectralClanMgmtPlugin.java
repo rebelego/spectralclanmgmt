@@ -12,12 +12,13 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import org.apache.commons.validator.routines.*;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @PluginDescriptor(
@@ -91,16 +92,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		else
 		{
-			UrlValidator validator = new UrlValidator(UrlValidator.ALLOW_2_SLASHES + UrlValidator.ALLOW_ALL_SCHEMES);
-			
-			if (validator.isValid(config.scriptURL()))
-			{
-				return true;
-			}
-			else
-			{
-				return false;
-			}
+			Pattern urlRegexPattern = Pattern.compile("^((http|https)://)?([a-zA-Z0-9]+[.])?[a-zA-Z0-9-]+(.[a-zA-Z]{2,6})?(:[0-9]{1,5})?(/[a-zA-Z0-9-._?,'+&%$#=~]*)*$");
+			boolean isValid = urlRegexPattern.matcher(config.scriptURL()).matches();
+			return isValid;
 		}
 	}
 	
