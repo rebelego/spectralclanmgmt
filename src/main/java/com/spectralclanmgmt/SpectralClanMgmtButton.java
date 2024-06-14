@@ -4,10 +4,7 @@ import net.runelite.api.clan.ClanSettings;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.api.*;
 import net.runelite.api.widgets.*;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,15 +26,13 @@ public class SpectralClanMgmtButton
 	private String task;
 	private String newMemberName;
 	private String newMemberDate;
-	private String altMemberName;
-	private String altMemberDate;
 	private String mainMemberName;
 	private final List<Widget> cornersAndEdges = new ArrayList<>();
 	private Widget textWidget;
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
 	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
 	
-	public SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin)
+	public SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtHttpRequest httpRequest)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
@@ -47,16 +42,15 @@ public class SpectralClanMgmtButton
 		this.clanmemberJoinDates = memberJoinDates;
 		this.clanSettings = clanSettings;
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
+		spectralClanMgmtHttpRequest = httpRequest;
 		
 		task = "";
 		newMemberName = "";
 		newMemberDate = "";
-		altMemberName = "";
-		altMemberDate = "";
 		mainMemberName = "";
 		
 		// **
-		// The following code segment was copied from the Wise Old Man Runelite Plugin. All credit for this code segment goes to dekvall.
+		// The following code segment was copied from the Wise Old Man Runelite Plugin and modified. All credit for this code segment goes to dekvall.
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_TOP_LEFT, 153, 6, 9, 9);
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_TOP_RIGHT, 38, 6, 9, 9);
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_BOTTOM_LEFT, 153, 20, 9, 9);
@@ -67,9 +61,11 @@ public class SpectralClanMgmtButton
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_EDGE_BOTTOM, 47, 20, 106, 9);
 		this.textWidget = this.createWidgetWithText();
 		// **
+		
+		spectralClanMgmtHttpRequest.setSpectralClanMgmtButton(this);
 	}
 	
-	// ** This method was copied from the Wise Old Man Runelite Plugin. All credit for this code segment goes to dekvall.
+	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. All credit for this code segment goes to dekvall.
 	private void createWidgetWithSprite(int spriteId, int x, int y, int width, int height)
 	{
 		Widget w = this.parent.createChild(-1, WidgetType.GRAPHIC);
@@ -155,10 +151,10 @@ public class SpectralClanMgmtButton
 		}
 		else if (task == "add-alt-get-new")
 		{
-			if (altMemberName != "" && altMemberDate != "")
+			if (newMemberName != "" && newMemberDate != "")
 			{
 				chatboxPanelManager
-				.openTextMenuInput("You've selected '" + altMemberName + "' as the Alt. Is this correct?<br>Click Yes to proceed, No to select again, or Cancel to exit.")
+				.openTextMenuInput("You've selected '" + newMemberName + "' as the Alt. Is this correct?<br>Click Yes to proceed, No to select again, or Cancel to exit.")
 				.option("Yes", () -> selectMain())
 				.option("No", () -> selectAlt())
 				.option("Cancel", () -> removeListeners())
@@ -171,7 +167,7 @@ public class SpectralClanMgmtButton
 		}
 		else if (task == "add-alt")
 		{
-			if (altMemberName != "" && altMemberDate != "" && mainMemberName != "")
+			if (newMemberName != "" && newMemberDate != "" && mainMemberName != "")
 			{
 				chatboxPanelManager
 				.openTextMenuInput("You've selected '" + mainMemberName + "' as the Main. Is this correct?<br>Click Yes to export the data, No to reselect the Main, or Cancel to exit.")
@@ -201,8 +197,8 @@ public class SpectralClanMgmtButton
 		{
 			task = "add-alt-get-new";
 			
-			String altMem = altMemberName;
-			altMemberName = "";
+			String altMem = newMemberName;
+			newMemberName = "";
 			
 			chatboxPanelManager
 			.openTextMenuInput("The member you've selected, '" + altMem + "', doesn't have the Alt rank.<br>Alts can only have the Alt rank.<br>Select a different member for the Alt, or click cancel to exit.")
@@ -211,7 +207,7 @@ public class SpectralClanMgmtButton
 		}
 		else if (task == "invalid-main")
 		{
-			if (altMemberName != "" && altMemberDate != "")
+			if (newMemberName != "" && newMemberDate != "")
 			{
 				task = "add-alt-get-main";
 				
@@ -270,23 +266,26 @@ public class SpectralClanMgmtButton
 		// Before we proceed, we'll check that the script's URL is set and valid.
 		if (spectralClanMgmtPlugin.checkURL() == true)
 		{
-			if (task == "add-new")
+			// An extra check, just in case...
+			if (spectralClanMgmtHttpRequest.isReady())
 			{
-				String tempPlayerName = newMemberName;
-				newMemberName = replaceBadChars(tempPlayerName);
+				spectralClanMgmtHttpRequest.initializeExecutor();
 				
-				spectralClanMgmtHttpRequest = new SpectralClanMgmtHttpRequest(this, spectralClanMgmtPlugin, spectralClanMgmtPlugin.returnConfig(), client);
-				spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName);
-			}
-			else if (task == "add-alt")
-			{
-				String tempPlayerName = altMemberName;
-				altMemberName = replaceBadChars(tempPlayerName);
-				tempPlayerName = mainMemberName;
-				mainMemberName = replaceBadChars(tempPlayerName);
-				
-				spectralClanMgmtHttpRequest = new SpectralClanMgmtHttpRequest(this, spectralClanMgmtPlugin, spectralClanMgmtPlugin.returnConfig(), client);
-				spectralClanMgmtHttpRequest.postRequestAsync(task, altMemberDate, mainMemberName, altMemberName);
+				if (task == "add-new")
+				{
+					String tempPlayerName = newMemberName;
+					newMemberName = replaceBadChars(tempPlayerName);
+					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName);
+				}
+				else if (task == "add-alt")
+				{
+					String tempPlayerName = newMemberName;
+					newMemberName = replaceBadChars(tempPlayerName);
+					tempPlayerName = mainMemberName;
+					mainMemberName = replaceBadChars(tempPlayerName);
+					
+					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, mainMemberName, newMemberName);
+				}
 			}
 		}
 		else
@@ -298,18 +297,17 @@ public class SpectralClanMgmtButton
 		}
 	}
 	
-	// This method is called from our HttpRequest class when a response is received.
+	// This method is called from our HttpRequest class when a response is received and the members list widget is currently loaded.
 	// It passes the status (success/failure) and the data holding the message from the web app.
 	// Once we've received the response, we'll store the parameters in local variables and shutdown the request's thread.
 	// The listeners are removed and the variables reset before the response is displayed in the chatbox.
 	// Additional text is appended before the response is displayed depending on the task's value if the export's status is "success".
-	public void exportDone(String stat, String dat)
+	public void exportDone(String tk, String stat, String dat)
 	{
 		String status = stat;
 		String response = dat;
-		String t = task;
+		String t = tk;
 		
-		spectralClanMgmtHttpRequest.shutdown();
 		removeListeners();
 		
 		if (status.equals("success"))
@@ -324,10 +322,21 @@ public class SpectralClanMgmtButton
 			}
 		}
 		
+		// Just in case there's a chatbox prompt open at the time.
+		chatboxPanelManager.close();
+		
 		chatboxPanelManager
 		.openTextMenuInput(response)
-		.option("OK", () -> chatboxPanelManager.close())
+		.option("OK", () -> finished())
 		.build();
+	}
+	
+	// I had to put these out here, otherwise the chatbox wouldn't show the result prompt
+	// when the response was received and this class' exportDone method was called.
+	private void finished()
+	{
+		chatboxPanelManager.close();
+		spectralClanMgmtHttpRequest.shutdown();
 	}
 	
 	// Adds the click listeners to the widgets in the member names column. These will return the 
@@ -338,8 +347,6 @@ public class SpectralClanMgmtButton
 		mainMemberSelected = false;
 		newMemberName = "";
 		newMemberDate = "";
-		altMemberName = "";
-		altMemberDate = "";
 		mainMemberName = "";
 		task = "";
 		
@@ -374,8 +381,8 @@ public class SpectralClanMgmtButton
 		mainMemberSelected = false;
 		newMemberName = "";
 		newMemberDate = "";
-		altMemberName = "";
-		altMemberDate = "";
+		newMemberName = "";
+		newMemberDate = "";
 		mainMemberName = "";
 		wasClicked = false;
 		task = "";
@@ -493,8 +500,8 @@ public class SpectralClanMgmtButton
 									{
 										// Flip the flag and set the local variable values to their corresponding global variables.
 										altMemberSelected = true;
-										altMemberName = selectedNewMemberName;
-										altMemberDate = selectedNewMemberDate;
+										newMemberName = selectedNewMemberName;
+										newMemberDate = selectedNewMemberDate;
 										confirmSelection();
 									}
 									else if (altMemberRank != 9)
@@ -504,9 +511,9 @@ public class SpectralClanMgmtButton
 										task = "invalid-alt";
 										// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
 										// but we want the selected name for the error message that's shown.
-										altMemberName = selectedNewMemberName;
+										newMemberName = selectedNewMemberName;
 										altMemberSelected = false;
-										altMemberDate = "";
+										newMemberDate = "";
 										// Proceed to the next step.
 										confirmSelection();
 									}
@@ -516,8 +523,8 @@ public class SpectralClanMgmtButton
 									// Just in case something else fucks up
 									task = "error";
 									altMemberSelected = false;
-									altMemberName = "";
-									altMemberDate = "";
+									newMemberName = "";
+									newMemberDate = "";
 									// Proceed to the next step.
 									confirmSelection();
 								}
@@ -617,8 +624,8 @@ public class SpectralClanMgmtButton
 		// reset the flag and global variables for that part of the task, then proceed.
 		task = "add-alt-get-new";
 		altMemberSelected = false;
-		altMemberName = "";
-		altMemberDate = "";
+		newMemberName = "";
+		newMemberDate = "";
 		
 		chatboxPanelManager.close();
 		
@@ -659,31 +666,43 @@ public class SpectralClanMgmtButton
 		
 		textWidget.setOnClickListener((JavaScriptCallback) e ->
 		{
-			// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
-			// a prompt in the chatbox.
-			if (urlCheck() == true)
+			if (spectralClanMgmtHttpRequest.isReady())
 			{
-				// wasClicked is used as a flag that stops the button from reacting to additional clicks
-				// after the first click until the admin either finishes selecting and exporting a member,
-				// cancels, or causes the members list widget to close.
-				// We don't want them clicking the button then starting the export process, only to click the button
-				// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
-				if (wasClicked == false)
+				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
+				// a prompt in the chatbox.
+				if (urlCheck() == true)
 				{
-					wasClicked = true;
-					
+					// wasClicked is used as a flag that stops the button from reacting to additional clicks
+					// after the first click until the admin either finishes selecting and exporting a member,
+					// cancels, or causes the members list widget to close.
+					// We don't want them clicking the button then starting the export process, only to click the button
+					// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
+					if (wasClicked == false)
+					{
+						wasClicked = true;
+						
+						chatboxPanelManager
+						.openTextMenuInput("Are you exporting a new Main or Alt member?<br>Select an option below, or click cancel to exit.")
+						.option("Main", () -> selectNew())
+						.option("Alt", () -> selectAlt())
+						.option("Cancel", () -> removeListeners())
+						.build();
+					}
+				}
+				else
+				{
 					chatboxPanelManager
-					.openTextMenuInput("Are you exporting a new Main or Alt member?<br>Select an option below, or click cancel to exit.")
-					.option("Main", () -> selectNew())
-					.option("Alt", () -> selectAlt())
-					.option("Cancel", () -> removeListeners())
+					.openTextMenuInput("Enter a valid URL for the script in the plugin's settings first.")
+					.option("OK", () -> chatboxPanelManager.close())
 					.build();
 				}
 			}
 			else
 			{
+				// If this occurs, then the response from a post request hasn't been received yet.
+				// This will automatically be closed, if it's not already, when the request's response is received.
 				chatboxPanelManager
-				.openTextMenuInput("Enter a valid URL for the script in the plugin's settings first.")
+				.openTextMenuInput("The previous export has not finished yet.")
 				.option("OK", () -> chatboxPanelManager.close())
 				.build();
 			}

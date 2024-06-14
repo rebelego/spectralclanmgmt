@@ -59,6 +59,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private static final int CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER = 45416450;
 	
+	private boolean memberWidgetLoaded = false;
+	
+	private SpectralClanMgmtHttpRequest httpRequest;
+	
 	@Provides
 	SpectralClanMgmtConfig getConfig(ConfigManager configManager)
 	{
@@ -69,17 +73,24 @@ public class SpectralClanMgmtPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		log.info("Spectral Clan Mgmt Plugin started!");
+		
+		// Need to create a new instance of Spectral's HttpRequest class at startup
+		// so that whenever the button is created, the same instance of Spectral's HttpRequest class
+		// will be passed to it each time and the isReady method in that class can be used to
+		// determine if the player can click the button or needs to wait for a previous export to finish.
+		// I'm also doing this so that if the members list widget is closed, making the button null,
+		// after a request is posted and still closed when the response is returned, 
+		// the response and clean up can be handled by this class instead of the button's class.
+		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
 	}
 	
 	@Override
 	protected void shutDown() throws Exception
 	{
 		log.info("Spectral Clan Mgmt Plugin stopped!");
-	}
-	
-	public SpectralClanMgmtConfig returnConfig()
-	{
-		return config;
+		
+		// Just calling this here just in case something happened and the executorService hasn't been shut down and set to null yet.
+		httpRequest.shutdown();
 	}
 	
 	// Checks if the script URL in the config is a valid URL. If it's missing, or it's not a valid URL, it'll return false
@@ -206,9 +217,54 @@ public class SpectralClanMgmtPlugin extends Plugin
 		return chars1.equals(chars2);
 	}
 	
+	public boolean isMemberWidgetLoaded()
+	{
+		return memberWidgetLoaded;
+	}
+	
 	private void createClanMemberButton(int w, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates)
 	{
-		spectralClanMemberButton = new SpectralClanMgmtButton(client, clientThread, chatboxPanelManager, w, clanmembers, clanmemberJoinDates, clanSettings, this);
+		spectralClanMemberButton = new SpectralClanMgmtButton(client, clientThread, chatboxPanelManager, w, clanmembers, clanmemberJoinDates, clanSettings, this, httpRequest);
+	}
+	
+	// This method is called from our HttpRequest class when a response is received and the members list widget is not loaded.
+	// It passes the status (success/failure) and the data holding the message from the web app.
+	// Once we've received the response, we'll store the parameters in local variables and shutdown the request's thread.
+	// The listeners are removed and the variables reset before the response is displayed in the chatbox.
+	// Additional text is appended before the response is displayed depending on the task's value if the export's status is "success".
+	public void exportDone(String task, String stat, String dat)
+	{
+		String status = stat;
+		String response = dat;
+		String t = task;
+		
+		if (status.equals("success"))
+		{
+			if (t == "add-new")
+			{
+				response = response + "<br>Don't forget to update the member's Discord name and role!";
+			}
+			else if (t == "add-alt")
+			{
+				response = response + "<br>Don't forget to add the alt to the Main's Discord name!";
+			}
+		}
+		
+		// Just in case there's a chatbox prompt open at the time
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput(response)
+		.option("OK", () -> finished())
+		.build();
+	}
+	
+	// I had to put these out here, otherwise the chatbox wouldn't show the result prompt
+	// when the response was received and this class' exportDone method was called.
+	private void finished()
+	{
+		chatboxPanelManager.close();
+		httpRequest.shutdown();
 	}
 	
 	@Subscribe
@@ -225,6 +281,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		else if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
 		{
+			// This is being set so that whenever a request is posted, if the members list UI is still open when the response is received
+			// the HttpRequest class will route the results to the exportDone method in the button's class instead of in this class.
+			memberWidgetLoaded = true;
+			
 			getMembersData();
 			
 			if (members != null)
@@ -280,6 +340,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 			members.clear();
 			memberJoinDates.clear();
 			localPlayerRank = 0;
+			
+			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received
+			// the HttpRequest class will route the results to the exportDone method in this class instead of the button's.
+			memberWidgetLoaded = false;
 		}
 	}
 }
