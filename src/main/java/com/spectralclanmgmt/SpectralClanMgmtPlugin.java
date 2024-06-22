@@ -49,6 +49,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private HashMap<String, String> memberJoinDates = new HashMap<String, String>();
 	
+	// The clan's admin ranks. The numbers are the key values in the ranks enum for the 
+	// Owner, Deputy Owner, Moderator, and Completionist (Recruiter) ranks.
 	private ArrayList<Integer> adminRanks = new ArrayList<>(Arrays.asList(-4, -3, 264, 252));
 	
 	private int localPlayerRank = 0;
@@ -59,6 +61,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private static final int CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER = 45416450;
 	
+	// Used to track if the user is currently viewing the Members List UI (which means the button exists).
 	private boolean memberWidgetLoaded = false;
 	
 	private SpectralClanMgmtHttpRequest httpRequest;
@@ -89,7 +92,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		log.info("Spectral Clan Mgmt Plugin stopped!");
 		
-		// Just calling this here just in case something happened and the executorService hasn't been shut down and set to null yet.
+		// Just calling this here just in case something weird happened and the executorService hasn't been shut down and set to null yet.
 		httpRequest.shutdown();
 	}
 	
@@ -103,14 +106,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		else
 		{
+			// For Spectral's purposes, there's no reason for the protocol to be anything other than http or https.
 			Pattern urlRegexPattern = Pattern.compile("^((http|https)://)?([a-zA-Z0-9]+[.])?[a-zA-Z0-9-]+(.[a-zA-Z]{2,6})?(:[0-9]{1,5})?(/[a-zA-Z0-9-._?,'+&%$#=~]*)*$");
 			boolean isValid = urlRegexPattern.matcher(config.scriptURL()).matches();
 			return isValid;
 		}
 	}
 	
-	// Populates the members hashmap with the member's name and position in the list of members returned from ClanSettings.
-	// Also clears the other hashmaps so they can be populated later with the most current key/value pairs.
+	// Clears and populates the members and membersJoinDates hashmaps with sorted values.
 	// These will be used after this finishes.
 	private void getMembersData()
 	{
@@ -129,27 +132,28 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			clanMembers = clanSettings.getMembers();
 			
-			// We get the members names into a temp arraylist, because we need to sort them alphabetically for later.
+			// We get the members names into a temp arraylist, so they can be sorted next.
 			ArrayList<String> mems = new ArrayList<String>();
 			
 			clanMembers.forEach((me) -> mems.add(me.getName()));
 			
-			// This should sort the arraylist of member names alphabetically while ignoring the letter cases.
+			// This sorts the arraylist of member names alphabetically while ignoring the letter cases.
 			Collections.sort(mems, String.CASE_INSENSITIVE_ORDER);
 			
 			int i = 0;
 			
 			for (String m : mems)
 			{
-				// Now that we've got a sorted list of member names, we'll put them into a hashmap, using i to act as an index for the member names.
-				// This will be used later in the button's class to match the name the player clicked on the UI to the name in this hashmap
-				// so we won't have to deal with the annoyance of getting text from a widget and sanitizing the text.
+				// Now that we've got a sorted list of member names, we'll put them into a hashmap, 
+				// using i to act as an index for the member names. This will be used later in the button's class 
+				// to match the name the player the user clicked on in the UI to the name in this hashmap 
+				// so we won't have to deal with the annoyance of getting the text from a widget and sanitizing it.
 				members.put(i, m);
 				i++;
 			}
 			
-			// We get the join date converted to be in the EST/EDT timezone 
-			// and add that along with the member's name to the memberJoinDates hashmap.
+			// Finally, we get the converted join date set for the EST/EDT timezone for each member
+			// and add it to the memberJoinDates hashmap. The member's name is the key and the join date is its value.
 			for (ClanMember cm : clanMembers)
 			{
 				String joinDate = convertJoinDate(cm);
@@ -250,7 +254,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 		}
 		
-		// Just in case there's a chatbox prompt open at the time
+		// Just in case there's a chatbox prompt open at the time.
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
@@ -272,17 +276,17 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (widget.getGroupId() == CLAN_SETTINGS_INTERFACE)
 		{
-			// Technically if they view this UI, regardless of which method they used to add a new member, they would have to have
-			// already finished adding them when this widget loads.
+			// Logically, if the user is viewing this UI, then regardless of which method they used to add the new member, 
+			// they would've already finished doing so when this widget loads.
 			clanSettings = client.getClanSettings(0);
 			
-			// Get the local player's clan rank. This will be used later to check if the mgmt button can be created.
+			// Get the local player's clan rank. This will be used later to check if the clan mgmt button can be created.
 			localPlayerRank = clanSettings.titleForRank(clanSettings.findMember(client.getLocalPlayer().getName()).getRank()).getId();
 		}
 		else if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
 		{
-			// This is being set so that whenever a request is posted, if the members list UI is still open when the response is received
-			// the HttpRequest class will route the results to the exportDone method in the button's class instead of in this class.
+			// This is being set so that whenever a request is posted, if the members list UI is still open when the response is received,
+			// the HttpRequest class will route the results to the exportDone method in the clan mgmt button's class instead of in this class.
 			memberWidgetLoaded = true;
 			
 			getMembersData();
@@ -299,12 +303,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 							if (memberJoinDates.size() == members.size() && localPlayerRank != 0)
 							{
 								// Since this plugin is meant solely for the Spectral clan to use, we don't want the button show
-								// if the local player isn't a member of the Spectral clan.
+								// if the local player isn't a member of that clan.
 								if (isSpectralClan() == true)
 								{
 									// Since this plugin is meant solely for the admin ranked members of Spectral clan to use, 
-									// we don't want the button to be created and displayed
-									// if the local player isn't an admin ranked member of the Spectral clan.
+									// we don't want the button to be created if the local player isn't an admin in Spectral.
 									if (adminRanks.contains(localPlayerRank))
 									{
 										clientThread.invoke(() ->
@@ -329,7 +332,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Subscribe
 	public void onWidgetClosed(WidgetClosed widget)
 	{
-		// If the members list widget is closed, reset everything just in case.
+		// If the Members List widget is closed, reset everything (just in case).
 		if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
 		{
 			if (clanMembers != null)
@@ -341,8 +344,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 			memberJoinDates.clear();
 			localPlayerRank = 0;
 			
-			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received
-			// the HttpRequest class will route the results to the exportDone method in this class instead of the button's.
+			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received,
+			// the HttpRequest class will route the results to the exportDone method in this class instead of the clan mgmt button's class.
 			memberWidgetLoaded = false;
 		}
 	}

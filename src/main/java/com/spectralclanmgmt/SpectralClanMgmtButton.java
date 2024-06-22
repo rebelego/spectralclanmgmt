@@ -339,7 +339,7 @@ public class SpectralClanMgmtButton
 		spectralClanMgmtHttpRequest.shutdown();
 	}
 	
-	// Adds the click listeners to the widgets in the member names column. These will return the 
+	// This adds the click listeners to specific widgets in the member names column.
 	public void setListeners()
 	{
 		newMemberSelected = false;
@@ -359,7 +359,7 @@ public class SpectralClanMgmtButton
 		// to the method of the widget's click listener. j is the child widget's position in the array of children, and that will
 		// allow us to get the value of the name displayed on the widget (without all the invisible or weird characters that fuck things up)
 		// which will then be used to get the member's int join date.
-		// We already got the member names and int join dates earlier from the cs2 script that was run when the members list widget was loaded.
+		// We already got the members' names and their join dates earlier when the members list widget was loaded.
 		for (int i = 1; i < memberWidgets.length; i = i + 3)
 		{
 			int j = i;
@@ -372,15 +372,13 @@ public class SpectralClanMgmtButton
 		listenersSet = true;
 	}
 	
-	// This is essentially a reset, everything is cleared and the listeners are removed in preparation for the button being clicked again
-	// or the members list widget being closed.
+	// This is essentially a reset, everything is cleared and the listeners are removed in preparation 
+	// for the button being clicked again or the members list widget being closed.
 	public void removeListeners()
 	{
 		newMemberSelected = false;
 		altMemberSelected = false;
 		mainMemberSelected = false;
-		newMemberName = "";
-		newMemberDate = "";
 		newMemberName = "";
 		newMemberDate = "";
 		mainMemberName = "";
@@ -403,10 +401,11 @@ public class SpectralClanMgmtButton
 	}
 	
 	// The method for the click listeners on the member names child widgets of the member names column.
-	// Depending on the task value, different parts are run to select a new main, a new alt, or a new alt's main.
-	// The first two parts are essentially the same, we use the value of j to get the index of the member's name in the hashmap. 
-	// Then we use the member's name to get their int join date. The int join date is then converted into a date string in the EST/EDT timezone.
-	// As for the third part, that's just for selecting the alt's main and getting their name from the hashmap after we've selected the alt.
+	// Depending on the option the user first selected, different methods will be run.
+	// The user can either select a new main or a new alt (along with the new alt's main in the clan).
+	// The first member selection is essentially the same, we use the value of j to get the index of the member's name in the hashmap. 
+	// Then we use the member's name to get their join date. The join date has already been converted into a date string for the EST/EDT timezone.
+	// As for the second part (for alts), it just retrieves the selected main's name from the hashmap, we don't need the alt's main's join date.
 	private void getSelectedMember(int j)
 	{
 		if (task == "add-new") // adding a new main task
