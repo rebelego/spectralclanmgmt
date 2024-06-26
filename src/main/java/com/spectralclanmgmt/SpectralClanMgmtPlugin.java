@@ -174,53 +174,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		return spectralJoinDate;
 	}
 	
-	// I have to do this to match the clan's name against the string "Spectral", 
-	// because for whatever reason checking if clanSettings.getName() == "Spectral" comes back false, even though it should be true.
-	private boolean isSpectralClan()
-	{
-		String clan1 = client.getClanSettings(0).getName();
-		String clan2 = "Spectral";
-		
-		char[] clanChars1 = clan1.toCharArray();
-		char[] clanChars2 = clan2.toCharArray();
-		
-		String chars1 = "";
-		String chars2 = "";
-		
-		for (int i = 0; i < clanChars1.length; i++)
-		{
-			int temp1 = (int) clanChars1[i];
-			
-			if (chars1 == "")
-			{
-				chars1 = String.valueOf(temp1);
-			}
-			else
-			{
-				chars1 = chars1 + ", " + String.valueOf(temp1);
-			}
-		}
-		
-		for (int j = 0; j < clanChars2.length; j++)
-		{
-			int temp2 = (int) clanChars2[j];
-			
-			if (chars2 == "")
-			{
-				chars2 = String.valueOf(temp2);
-			}
-			else
-			{
-				chars2 = chars2 + ", " + String.valueOf(temp2);
-			}
-		}
-		
-		chars1 = chars1.trim();
-		chars2 = chars2.trim();
-		
-		return chars1.equals(chars2);
-	}
-	
 	public boolean isMemberWidgetLoaded()
 	{
 		return memberWidgetLoaded;
@@ -303,8 +256,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 							if (memberJoinDates.size() == members.size() && localPlayerRank != 0)
 							{
 								// Since this plugin is meant solely for the Spectral clan to use, we don't want the button show
-								// if the local player isn't a member of that clan.
-								if (isSpectralClan() == true)
+								// if the local player isn't a member of the clan.
+								if (client.getClanSettings(0).getName().equals("Spectral") == true)
 								{
 									// Since this plugin is meant solely for the admin ranked members of Spectral clan to use, 
 									// we don't want the button to be created if the local player isn't an admin in Spectral.
