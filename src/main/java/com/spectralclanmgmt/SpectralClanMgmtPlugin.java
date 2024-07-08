@@ -179,10 +179,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 		return memberWidgetLoaded;
 	}
 	
+	// ** This method was copied from the Wise Old Man Runelite Plugin code and rewritten to fit this plugin's usage. 
+	// All credit for this code segment goes to dekvall.
 	private void createClanMemberButton(int w, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates)
 	{
 		spectralClanMemberButton = new SpectralClanMgmtButton(client, clientThread, chatboxPanelManager, w, clanmembers, clanmemberJoinDates, clanSettings, this, httpRequest);
 	}
+	// **
 	
 	// This method is called from our HttpRequest class when a response is received and the members list widget is not loaded.
 	// It passes the status (success/failure) and the data holding the message from the web app.
@@ -263,6 +266,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 									// we don't want the button to be created if the local player isn't an admin in Spectral.
 									if (adminRanks.contains(localPlayerRank))
 									{
+										// ** This method was copied from the Wise Old Man Runelite Plugin code and modified to fit this plugin's usage. 
+										// All credit for this code segment goes to dekvall.
 										clientThread.invoke(() ->
 										{
 											createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, members, memberJoinDates);
@@ -272,6 +277,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 												spectralClanMemberButton.enableButton();
 											}
 										});
+										// **
 									}
 								}
 							}
