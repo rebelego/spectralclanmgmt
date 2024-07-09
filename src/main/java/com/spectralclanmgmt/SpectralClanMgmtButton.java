@@ -23,10 +23,14 @@ public class SpectralClanMgmtButton
 	private boolean newMemberSelected = false;
 	private boolean altMemberSelected = false;
 	private boolean mainMemberSelected = false;
+	private boolean changedMemberSelected = false;
 	private String task;
 	private String newMemberName;
 	private String newMemberDate;
 	private String mainMemberName;
+	private String memberCurrentName;
+	private String memberOldName;
+	private String memberType;
 	private final List<Widget> cornersAndEdges = new ArrayList<>();
 	private Widget textWidget;
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
@@ -48,9 +52,13 @@ public class SpectralClanMgmtButton
 		newMemberName = "";
 		newMemberDate = "";
 		mainMemberName = "";
+		memberCurrentName = "";
+		memberOldName = "";
+		memberType = "";
 		
 		// **
-		// The following code segment was copied from the Wise Old Man Runelite Plugin and modified. All credit for this code segment goes to dekvall.
+		// The following code segment was copied from the Wise Old Man Runelite Plugin and modified. 
+		// All credit for this code segment goes to dekvall.
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_TOP_LEFT, 153, 6, 9, 9);
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_TOP_RIGHT, 38, 6, 9, 9);
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_METAL_CORNER_BOTTOM_LEFT, 153, 20, 9, 9);
@@ -65,7 +73,8 @@ public class SpectralClanMgmtButton
 		spectralClanMgmtHttpRequest.setSpectralClanMgmtButton(this);
 	}
 	
-	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. All credit for this code segment goes to dekvall.
+	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. 
+	// All credit for this code segment goes to dekvall.
 	private void createWidgetWithSprite(int spriteId, int x, int y, int width, int height)
 	{
 		Widget w = this.parent.createChild(-1, WidgetType.GRAPHIC);
@@ -82,7 +91,8 @@ public class SpectralClanMgmtButton
 	}
 	// **
 	
-	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. All credit for this code segment goes to dekvall.
+	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. 
+	// All credit for this code segment goes to dekvall.
 	private Widget createWidgetWithText()
 	{
 		Widget textWidget = this.parent.createChild(-1, WidgetType.TEXT);
@@ -107,7 +117,8 @@ public class SpectralClanMgmtButton
 	}
 	// **
 	
-	// ** This method was copied from the Wise Old Man Runelite Plugin code. All credit for this code segment goes to dekvall.
+	// ** This method was copied from the Wise Old Man Runelite Plugin code. 
+	// All credit for this code segment goes to dekvall.
 	private void update(boolean hovered)
 	{
 		for (Widget w : cornersAndEdges)
@@ -133,7 +144,7 @@ public class SpectralClanMgmtButton
 	{
 		chatboxPanelManager.close();
 		
-		if (task == "add-new")
+		if (task.equals("add-new"))
 		{
 			if (newMemberName != "" && newMemberDate != "")
 			{
@@ -149,7 +160,7 @@ public class SpectralClanMgmtButton
 				task = "error";
 			}
 		}
-		else if (task == "add-alt-get-new")
+		else if (task.equals("add-alt-get-new"))
 		{
 			if (newMemberName != "" && newMemberDate != "")
 			{
@@ -165,7 +176,7 @@ public class SpectralClanMgmtButton
 				task = "error";
 			}
 		}
-		else if (task == "add-alt")
+		else if (task.equals("add-alt"))
 		{
 			if (newMemberName != "" && newMemberDate != "" && mainMemberName != "")
 			{
@@ -181,7 +192,23 @@ public class SpectralClanMgmtButton
 				task = "error";
 			}
 		}
-		else if (task == "invalid-new")
+		else if (task.equals("name-change"))
+		{
+			if (!memberCurrentName.equals("") && !memberOldName.equals(""))
+			{
+				chatboxPanelManager
+				.openTextMenuInput("You have selected '" + memberCurrentName + "'. Is this correct?<br>Click Yes to export the data, No to select again, or Cancel to exit.")
+				.option("Yes", () -> exportMember())
+				.option("No", () -> selectNameChange())
+				.option("Cancel", () -> removeListeners())
+				.build();
+			}
+			else
+			{
+				task = "error";
+			}
+		}
+		else if (task.equals("invalid-new"))
 		{
 			task = "add-new";
 			
@@ -193,7 +220,7 @@ public class SpectralClanMgmtButton
 			.option("Cancel", () -> removeListeners())
 			.build();
 		}
-		else if (task == "invalid-alt")
+		else if (task.equals("invalid-alt"))
 		{
 			task = "add-alt-get-new";
 			
@@ -205,9 +232,10 @@ public class SpectralClanMgmtButton
 			.option("Cancel", () -> removeListeners())
 			.build();
 		}
-		else if (task == "invalid-main")
+		else if (task.equals("invalid-main"))
 		{
-			if (newMemberName != "" && newMemberDate != "")
+			// Double check that the selected alt member's name and join date are still set in their variables.
+			if (!newMemberName.equals("") && !newMemberDate.equals(""))
 			{
 				task = "add-alt-get-main";
 				
@@ -224,9 +252,43 @@ public class SpectralClanMgmtButton
 				task = "error";
 			}
 		}
+		else if (task.equals("no-friends"))
+		{
+			removeListeners();
+			
+			chatboxPanelManager
+			.openTextMenuInput("Your Friends list is empty.<br>For name change exports, the member must be on your Friends list.")
+			.option("OK", () -> chatboxPanelManager.close())
+			.build();
+		}
+		else if (task.equals("not-friend"))
+		{
+			String changedMem = memberCurrentName;
+			
+			removeListeners();
+			
+			chatboxPanelManager
+			.openTextMenuInput("'" + changedMem + "' isn't on your Friends list.<br>For name change exports, the member must be on your Friends list.")
+			.option("OK", () -> chatboxPanelManager.close())
+			.build();
+		}
+		else if (task.equals("no-name-change"))
+		{
+			task = "name-change";
+			
+			String changedMem = memberCurrentName;
+			memberCurrentName = "";
+			memberOldName = "";
+			memberType = "";
+			
+			chatboxPanelManager
+			.openTextMenuInput("'" + changedMem + "' doesn't have a previous name.<br>Select a different member, or click cancel to exit.")
+			.option("Cancel", () -> removeListeners())
+			.build();
+		}
 		
-		// Something really odd has to happen for it to end up here, but this will catch those cases and just reset everything.
-		if (task == "error")
+		// Something really odd has to happen for it to end up here, but this should catch those cases and reset everything.
+		if (task.equals("error"))
 		{
 			removeListeners();
 			
@@ -271,13 +333,13 @@ public class SpectralClanMgmtButton
 			{
 				spectralClanMgmtHttpRequest.initializeExecutor();
 				
-				if (task == "add-new")
+				if (task.equals("add-new"))
 				{
 					String tempPlayerName = newMemberName;
 					newMemberName = replaceBadChars(tempPlayerName);
 					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName);
 				}
-				else if (task == "add-alt")
+				else if (task.equals("add-alt"))
 				{
 					String tempPlayerName = newMemberName;
 					newMemberName = replaceBadChars(tempPlayerName);
@@ -285,6 +347,14 @@ public class SpectralClanMgmtButton
 					mainMemberName = replaceBadChars(tempPlayerName);
 					
 					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, mainMemberName, newMemberName);
+				}
+				else if (task.equals("name-change"))
+				{
+					String tempPlayerName = memberCurrentName;
+					memberCurrentName = replaceBadChars(tempPlayerName);
+					tempPlayerName = memberOldName;
+					memberOldName = replaceBadChars(tempPlayerName);
+					spectralClanMgmtHttpRequest.postRequestAsync(task, memberCurrentName, memberOldName, memberType, true);
 				}
 			}
 		}
@@ -312,13 +382,17 @@ public class SpectralClanMgmtButton
 		
 		if (status.equals("success"))
 		{
-			if (t == "add-new")
+			if (t.equals("add-new"))
 			{
 				response = response + "<br>Don't forget to update the member's Discord name and role!";
 			}
-			else if (t == "add-alt")
+			else if (t.equals("add-alt"))
 			{
 				response = response + "<br>Don't forget to add the alt to the Main's Discord name!";
+			}
+			else if (t.equals("name-change"))
+			{
+				response = response + "<br>Don't forget to update the member's Discord name!";
 			}
 		}
 		
@@ -345,9 +419,13 @@ public class SpectralClanMgmtButton
 		newMemberSelected = false;
 		altMemberSelected = false;
 		mainMemberSelected = false;
+		changedMemberSelected = false;
 		newMemberName = "";
 		newMemberDate = "";
 		mainMemberName = "";
+		memberCurrentName = "";
+		memberOldName = "";
+		memberType = "";
 		task = "";
 		
 		// This gets the child widgets of the member names column widget.
@@ -379,9 +457,13 @@ public class SpectralClanMgmtButton
 		newMemberSelected = false;
 		altMemberSelected = false;
 		mainMemberSelected = false;
+		changedMemberSelected = false;
 		newMemberName = "";
 		newMemberDate = "";
 		mainMemberName = "";
+		memberCurrentName = "";
+		memberOldName = "";
+		memberType = "";
 		wasClicked = false;
 		task = "";
 		
@@ -408,7 +490,7 @@ public class SpectralClanMgmtButton
 	// As for the second part (for alts), it just retrieves the selected main's name from the hashmap, we don't need the alt's main's join date.
 	private void getSelectedMember(int j)
 	{
-		if (task == "add-new") // adding a new main task
+		if (task.equals("add-new")) // adding a new main task
 		{
 			if (newMemberSelected == false)
 			{
@@ -430,7 +512,7 @@ public class SpectralClanMgmtButton
 								String selectedNewMemberName = clanmembers.get(sn);
 								String selectedNewMemberDate = clanmemberJoinDates.get(selectedNewMemberName);
 								
-								if (selectedNewMemberName != "" && selectedNewMemberDate != "")
+								if (!selectedNewMemberName.equals("") && !selectedNewMemberDate.equals(""))
 								{
 									int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
 									
@@ -454,7 +536,7 @@ public class SpectralClanMgmtButton
 										confirmSelection();
 									}
 								}
-								else
+								else // Something went wrong.
 								{
 									task = "error";
 									newMemberSelected = false;
@@ -469,7 +551,7 @@ public class SpectralClanMgmtButton
 				}
 			}
 		}
-		else if (task == "add-alt-get-new") // first half of the add-alt overall task
+		else if (task.equals("add-alt-get-new")) // first half of the add-alt overall task
 		{
 			// We're getting the new alt member here
 			if (altMemberSelected == false)
@@ -517,9 +599,8 @@ public class SpectralClanMgmtButton
 										confirmSelection();
 									}
 								}
-								else
+								else  // Something went wrong.
 								{
-									// Just in case something else fucks up
 									task = "error";
 									altMemberSelected = false;
 									newMemberName = "";
@@ -528,54 +609,115 @@ public class SpectralClanMgmtButton
 									confirmSelection();
 								}
 							}
+							else  // Something went wrong.
+							{
+								task = "error";
+								altMemberSelected = false;
+								newMemberName = "";
+								newMemberDate = "";
+								// Proceed to the next step.
+								confirmSelection();
+							}
+						}
+						else  // Something went wrong.
+						{
+							task = "error";
+							altMemberSelected = false;
+							newMemberName = "";
+							newMemberDate = "";
+							// Proceed to the next step.
+							confirmSelection();
 						}
 					}
+					else  // Something went wrong.
+					{
+						task = "error";
+						altMemberSelected = false;
+						newMemberName = "";
+						newMemberDate = "";
+						// Proceed to the next step.
+						confirmSelection();
+					}
+				}
+				else  // Something went wrong.
+				{
+					task = "error";
+					altMemberSelected = false;
+					newMemberName = "";
+					newMemberDate = "";
+					// Proceed to the next step.
+					confirmSelection();
 				}
 			}
 		}
-		else if (task == "add-alt-get-main") // second half of the add-alt overall task
+		else if (task.equals("add-alt-get-main")) // second half of the add-alt overall task
 		{
 			// If an alt member has been selected, but the alt's main hasn't been selected, this code segment will be run.
 			if (altMemberSelected == true && mainMemberSelected == false)
 			{
+				// j is for the position of the child widget in the children array. 
+				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
+				// So if j = 1, then sn will be 0. If j = 7, sn will be 2.
 				int sn = (j - 1) / 3;
 				
-				// For selecting an alt's main, we only want to get the name and store it in a local variable.
-				String selectedMainMemberName = clanmembers.get(sn);
-				
-				if (selectedMainMemberName != "")
+				if (clanmembers != null)
 				{
-					// Now I need to check the rank of the selected main for the alt, 
-					// because main accounts can't have the Guest rank (this was added just in case something bizarre happens 
-					// that makes this possible, it really shouldn't be) or the Gnome Child rank, since that's strictly for Alt accounts.
-					int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMainMemberName).getRank()).getId();
-					
-					if (mainMemberRank != 9 && mainMemberRank != -1)
+					if (clanmembers.size() > 0)
 					{
-						// The selected member for the main has a normal rank. Since we've selected both an alt and a main, 
-						// we set the task value to the value it needs to be at the end to signal it's time to export.
-						task = "add-alt";
-						// Flip the flag and set the local variable values to their corresponding global variables.
-						mainMemberSelected = true;
-						mainMemberName = selectedMainMemberName;
-						// Proceed to the next step.
-						confirmSelection();
+						// For selecting an alt's main, we only want to get the name and store it in a local variable.
+						String selectedMainMemberName = clanmembers.get(sn);
+						
+						if (!selectedMainMemberName.equals(""))
+						{
+							// Now I need to check the rank of the selected main for the alt, 
+							// because main accounts can't have the Guest rank (this was added just in case something bizarre happens 
+							// that makes this possible, it really shouldn't be) or the Gnome Child rank, since that's strictly for Alt accounts.
+							int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMainMemberName).getRank()).getId();
+							
+							if (mainMemberRank != 9 && mainMemberRank != -1)
+							{
+								// The selected member for the main has a normal rank. Since we've selected both an alt and a main, 
+								// we set the task value to the value it needs to be at the end to signal it's time to export.
+								task = "add-alt";
+								// Flip the flag and set the local variable values to their corresponding global variables.
+								mainMemberSelected = true;
+								mainMemberName = selectedMainMemberName;
+								// Proceed to the next step.
+								confirmSelection();
+							}
+							else if (mainMemberRank == 9)
+							{
+								// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
+								// This will happen if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
+								task = "invalid-main";
+								// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
+								// but we want the selected name for the error message that's shown.
+								// Make sure the flag remains set to false.
+								mainMemberName = selectedMainMemberName;
+								mainMemberSelected = false;
+								// Proceed to the next step.
+								confirmSelection();
+							}
+						}
+						else // Something went wrong.
+						{
+							task = "error";
+							mainMemberSelected = false;
+							mainMemberName = "";
+							// Proceed to the next step.
+							confirmSelection();
+						}
 					}
-					else if (mainMemberRank == 9)
+					else // Something went wrong.
 					{
-						// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
-						// This will happen if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
-						task = "invalid-main";
-						// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
-						// but we want the selected name for the error message that's shown.
-						// Make sure the flag remains set to false.
-						mainMemberName = selectedMainMemberName;
+						task = "error";
 						mainMemberSelected = false;
+						mainMemberName = "";
 						// Proceed to the next step.
 						confirmSelection();
 					}
 				}
-				else
+				else // Something went wrong.
 				{
 					task = "error";
 					mainMemberSelected = false;
@@ -585,11 +727,142 @@ public class SpectralClanMgmtButton
 				}
 			}
 		}
+		else if (task .equals("name-change"))
+		{
+			if (changedMemberSelected == false)
+			{
+				// j is for the position of the child widget in the children array. 
+				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
+				// So if j = 1, then sn will be 0. If j = 7, sn will be 2.
+				int sn = (j - 1) / 3;
+				
+				if (clanmembers != null)
+				{
+					if (clanmembers.size() > 0)
+					{
+						// For selecting a name change, we only want to get the current name and store it in a local variable.
+						String selectedChangedMember = clanmembers.get(sn);
+						
+						if (!selectedChangedMember.equals(""))
+						{
+							int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedChangedMember).getRank()).getId();
+							
+							if (memberRank != 9 && memberRank != -1)
+							{
+								memberType = "main";
+							}
+							else if (memberRank == 9)
+							{
+								memberType = "alt";
+							}
+							else if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
+							{
+								memberType = "";
+							}
+							
+							if (!memberType.equals(""))
+							{
+								// Check if there's at least one friend on the admin's Friends list.
+								if (client.getFriendContainer().getCount() > 0)
+								{
+									Friend changedMember = client.getFriendContainer().findByName(selectedChangedMember);
+									
+									// Check if the selected member is on the admin's Friends list.
+									if (changedMember != null)
+									{
+										// Check if the member has changed their name before.
+										if (changedMember.getPrevName() != null && !changedMember.getPrevName().equals(""))
+										{
+											changedMemberSelected = true;
+											memberCurrentName = selectedChangedMember;
+											memberOldName = changedMember.getPrevName();
+											// Proceed to the next step.
+											confirmSelection();
+										}
+										else // The member hasn't changed their name before.
+										{
+											task = "no-name-change";
+											changedMemberSelected = false;
+											memberCurrentName = selectedChangedMember;
+											memberOldName = "";
+											memberType = "";
+											// Proceed to the next step.
+											confirmSelection();
+										}
+									}
+									else // The member isn't on the admin's Friends list.
+									{
+										task = "not-friend";
+										changedMemberSelected = false;
+										memberCurrentName = selectedChangedMember;
+										memberOldName = "";
+										memberType = "";
+										// Proceed to the next step.
+										confirmSelection();
+									}
+								}
+								else // The admin's Friends list is empty.
+								{
+									task = "no-friends";
+									changedMemberSelected = false;
+									memberCurrentName = "";
+									memberOldName = "";
+									memberType = "";
+									// Proceed to the next step.
+									confirmSelection();
+								}
+							}
+							else
+							{
+								task = "error";
+								changedMemberSelected = false;
+								memberCurrentName = "";
+								memberOldName = "";
+								memberType = "";
+								// Proceed to the next step.
+								confirmSelection();
+							}
+						}
+						else // Something went wrong.
+						{
+							task = "error";
+							changedMemberSelected = false;
+							memberCurrentName = "";
+							memberOldName = "";
+							memberType = "";
+							// Proceed to the next step.
+							confirmSelection();
+						}
+					}
+					else // Something went wrong.
+					{
+						task = "error";
+						changedMemberSelected = false;
+						memberCurrentName = "";
+						memberOldName = "";
+						memberType = "";
+						// Proceed to the next step.
+						confirmSelection();
+					}
+				}
+				else // Something went wrong.
+				{
+					task = "error";
+					changedMemberSelected = false;
+					memberCurrentName = "";
+					memberOldName = "";
+					memberType = "";
+					// Proceed to the next step.
+					confirmSelection();
+				}
+			}
+		}
 	}
 	
+	// Admin chose to add a new Main clan member
 	public void selectNew()
 	{
-		// Since there's two methods where setListeners can be called and these methods can be visited more than once,
+		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
 		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
 		if (listenersSet == false)
 		{
@@ -610,9 +883,10 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
+	// Admin chose to add a new Alt clan member
 	public void selectAlt()
 	{
-		// Since there's two methods where setListeners can be called and these methods can be visited more than once,
+		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
 		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
 		if (listenersSet == false)
 		{
@@ -634,6 +908,7 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
+	// Get the Main for the new Alt clan member
 	public void selectMain()
 	{
 		// We would only reach this point after selectAlt has been run, 
@@ -653,10 +928,87 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
+	// Admin chose to export a name change
+	public void selectNameChange()
+	{
+		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
+		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
+		if (listenersSet == false)
+		{
+			setListeners();
+		}
+		
+		// Set the task to the admin's choice, reset the flag and global variables, then proceed.
+		task = "name-change";
+		changedMemberSelected = false;
+		memberCurrentName = "";
+		memberOldName = "";
+		// memberType will determine which column is searched on one of the sheets that has to be updated for name changes.
+		memberType = "";
+		
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Select the member whose name was changed from the left column.<br>Or click cancel to exit.")
+		.option("Cancel", () -> removeListeners())
+		.build();
+	}
+	
+	// Admin selected No after choosing the Name Change option at the initial prompt.
+	public void abortNameChange()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("For name change exports, the member must be on your Friends list.<br>You can remove the member from your Friends list afterwards.")
+		.option("OK", () -> {
+			wasClicked = false;
+			chatboxPanelManager.close();
+		})
+		.build();
+	}
+	
+	// A check prompt for the admin to confirm the prerequisite condition, the clan member being on their Friends list, is met.
+	// An admin will need to add the clan member that changed their name to their Friends list first (they're aware of this)
+	// before they can export the clan member's current and previous name to the script that will update the spreadsheet pages.
+	// There are checks that will happen prior to the export being posted to ensure the member is on their Friends list
+	// and has changed their name before.
+	public void nameChangeCheckPreReq()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Is the member whose name was changed on your Friends list?")
+		.option("Yes", () -> selectNameChange())
+		.option("No", () -> abortNameChange())
+		.option("Cancel", () -> { 
+			wasClicked = false; 
+			chatboxPanelManager.close(); 
+		})
+		.build();
+	}
+	
 	// Gets the value from the main class' checkURL method so we can use it in the enableButton method of this class.
 	private boolean urlCheck()
 	{
 		return spectralClanMgmtPlugin.checkURL();
+	}
+	
+	// I separated out the new member export options cause the chatbox looked too crowded when there were 4 options to click.
+	// If the admin selects to export a new member, they'll see this prompt next.
+	private void memberExport()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Are you exporting a new Main or Alt member?<br>Select an option below, or click cancel to exit.")
+		.option("Main", () -> selectNew())
+		.option("Alt", () -> selectAlt())
+		.option("Cancel", () -> {
+			wasClicked = false;
+			chatboxPanelManager.close();
+		})
+		.build();
 	}
 	
 	public void enableButton()
@@ -669,7 +1021,7 @@ public class SpectralClanMgmtButton
 			{
 				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
 				// a prompt in the chatbox.
-				if (urlCheck() == true)
+				if (urlCheck())
 				{
 					// wasClicked is used as a flag that stops the button from reacting to additional clicks
 					// after the first click until the admin either finishes selecting and exporting a member,
@@ -681,10 +1033,13 @@ public class SpectralClanMgmtButton
 						wasClicked = true;
 						
 						chatboxPanelManager
-						.openTextMenuInput("Are you exporting a new Main or Alt member?<br>Select an option below, or click cancel to exit.")
-						.option("Main", () -> selectNew())
-						.option("Alt", () -> selectAlt())
-						.option("Cancel", () -> removeListeners())
+						.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
+						.option("Member", () -> memberExport())
+						.option("Name Change", () -> nameChangeCheckPreReq())
+						.option("Cancel", () -> {
+							wasClicked = false;
+							chatboxPanelManager.close();
+						})
 						.build();
 					}
 				}

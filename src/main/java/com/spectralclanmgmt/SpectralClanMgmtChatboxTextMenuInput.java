@@ -107,29 +107,28 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 	protected void open()
 	{
 		Widget container = chatboxPanelManager.getContainerWidget();
-		
 		Widget prompt = container.createChild(-1, WidgetType.TEXT);
 		
 		prompt.setText(title);
 		prompt.setTextColor(0x000000);
-		prompt.setFontId(FontID.VERDANA_13_BOLD);
+		prompt.setFontId(FontID.QUILL_8);
 		
 		prompt.setXPositionMode(WidgetPositionMode.ABSOLUTE_CENTER);
 		prompt.setOriginalX(0);
 		prompt.setYPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
-		prompt.setOriginalY(20);
-		prompt.setOriginalHeight(24);
+		prompt.setOriginalY(16);
+		prompt.setOriginalHeight(28);
 		
-		prompt.setLineHeight(20);
+		prompt.setLineHeight(18);
 		prompt.setXTextAlignment(WidgetTextAlignment.CENTER);
 		prompt.setYTextAlignment(WidgetTextAlignment.CENTER);
 		prompt.setWidthMode(WidgetSizeMode.MINUS);
 		prompt.revalidate();
 		
-		int y = prompt.getRelativeY() + prompt.getHeight() + 6;
-		int height = container.getHeight() - y - 20;
+		int y = prompt.getRelativeY() + prompt.getHeight() + 2;
+		int height = container.getHeight() - y - 16;
 		int step = height / options.size();
-		int maxStep = options.size() >= 3 ? 25 : 30;
+		int maxStep = options.size() >= 3 ? 25 : 28;
 		
 		if (step > maxStep)
 		{
@@ -138,18 +137,25 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 			y += (ds * options.size()) / 2;
 		}
 		
+		int optionNum = 1;
+		
 		for (Entry option : options)
 		{
+			if (optionNum == 1 && options.size() > 1)
+			{
+				y += 2;
+			}
+			
 			Widget optWidget = container.createChild(-1, WidgetType.TEXT);
 			
 			optWidget.setText(option.text);
-			optWidget.setFontId(FontID.VERDANA_13_BOLD);
+			optWidget.setFontId(FontID.QUILL_8);
 			optWidget.setTextColor(0xFF0000);
 			optWidget.setXPositionMode(WidgetPositionMode.ABSOLUTE_CENTER);
-			optWidget.setOriginalX(0);
 			optWidget.setYPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
+			optWidget.setOriginalX(0);
 			optWidget.setOriginalY(y);
-			optWidget.setOriginalHeight(24);
+			optWidget.setOriginalHeight(20);
 			
 			optWidget.setXTextAlignment(WidgetTextAlignment.CENTER);
 			optWidget.setYTextAlignment(WidgetTextAlignment.CENTER);
@@ -163,17 +169,15 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 			optWidget.revalidate();
 			
 			y = y + step + 2;
+			optionNum += 1;
 		}
 	}
 	
 	private void callback(Entry entry)
 	{
 		Widget container = chatboxPanelManager.getContainerWidget();
-		
 		container.setOnKeyListener((Object[]) null);
-		
 		chatboxPanelManager.close();
-		
 		entry.callback.run();
 	}
 	

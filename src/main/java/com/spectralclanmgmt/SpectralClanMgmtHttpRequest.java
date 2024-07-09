@@ -42,6 +42,7 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
+	// The method for posting new Main clan member exports.
 	public void postRequestAsync(String task, String joinDate, String mainPlayer)
 	{
 		if (executorService != null)
@@ -120,6 +121,7 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
+	// The method for posting new Alt clan member exports.
 	public void postRequestAsync(String task, String joinDate, String mainPlayer, String altPlayer)
 	{
 		if (executorService != null)
@@ -202,6 +204,90 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
+	// The method for posting clan member name change exports.
+	// The nameChangeFlag is just there to make this method different from the other one that accepts four String arguments.
+	public void postRequestAsync(String task, String currentName, String oldName, String memberType, boolean nameChangeFlag)
+	{
+		if (executorService != null)
+		{
+			// On the off-chance someone stupidly changes the value for the URL to something invalid, 
+			// it'll check again before executing.
+			if (spectralClanMgmtPlugin.checkURL() == true)
+			{
+				executorService.execute(() ->
+				{
+					try
+					{
+						// URL of the web app for the script.
+						String url = config.scriptURL();
+						
+						StringBuilder postData = new StringBuilder();
+						
+						postData.append(URLEncoder.encode("task", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(task, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("currentName", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(currentName, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("oldName", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(oldName, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("memberType", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(memberType, "UTF-8"));
+						
+						URL obj = new URL(url);
+						HttpURLConnection con = (HttpURLConnection)obj.openConnection();
+						
+						con.setRequestMethod("POST");
+						con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+						
+						con.setDoOutput(true);
+						DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+						wr.writeBytes(postData.toString());
+						wr.flush();
+						wr.close();
+						
+						int responseCode = con.getResponseCode();
+						System.out.println("Response code: " + responseCode);
+						
+						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
+						String inputLine;
+						StringBuffer response = new StringBuffer();
+						
+						while ((inputLine = incoming.readLine()) != null)
+						{
+							response.append(inputLine);
+						}
+						
+						incoming.close();
+						
+						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+						String status = resp.get("status").getAsString();
+						String data = resp.get("data").getAsString();
+						
+						responseReceived("name-change", status, data);
+					}
+					catch (Exception e)
+					{
+						e.printStackTrace();
+					}
+				});
+			}
+			else
+			{
+				responseReceived("", "failure", "The script URL is either missing or not valid.");
+			}
+		}
+		else
+		{
+			responseReceived("", "failure", "You have to initialize the executor service first.");
+		}
+	}
+	
 	// It made more sense to just move this code to its own method rather than have the same code duplicated in both of the post methods.
 	private void responseReceived(String task, String status, String data)
 	{
@@ -257,7 +343,7 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
-	// This is to make sure that the player won't be able to click the button to start adding another member 
+	// This is to make sure that the player won't be able to click the button to start another export
 	// until the executorService is null again. It would just cause problems if I let multiple requests get queued.
 	public boolean isReady()
 	{

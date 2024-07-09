@@ -180,7 +180,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin code and rewritten to fit this plugin's usage. 
-	// All credit for this code segment goes to dekvall.
+	// All credit for the original code goes to dekvall.
 	private void createClanMemberButton(int w, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates)
 	{
 		spectralClanMemberButton = new SpectralClanMgmtButton(client, clientThread, chatboxPanelManager, w, clanmembers, clanmemberJoinDates, clanSettings, this, httpRequest);
@@ -200,13 +200,17 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (status.equals("success"))
 		{
-			if (t == "add-new")
+			if (t.equals("add-new"))
 			{
 				response = response + "<br>Don't forget to update the member's Discord name and role!";
 			}
-			else if (t == "add-alt")
+			else if (t.equals("add-alt"))
 			{
 				response = response + "<br>Don't forget to add the alt to the Main's Discord name!";
+			}
+			else if (t.equals("name-change"))
+			{
+				response = response + "<br>Don't forget to update the member's Discord name!";
 			}
 		}
 		
@@ -260,14 +264,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 							{
 								// Since this plugin is meant solely for the Spectral clan to use, we don't want the button show
 								// if the local player isn't a member of the clan.
-								if (client.getClanSettings(0).getName().equals("Spectral") == true)
+								if (client.getClanSettings(0).getName().equals("Spectral"))
 								{
 									// Since this plugin is meant solely for the admin ranked members of Spectral clan to use, 
 									// we don't want the button to be created if the local player isn't an admin in Spectral.
 									if (adminRanks.contains(localPlayerRank))
 									{
 										// ** This method was copied from the Wise Old Man Runelite Plugin code and modified to fit this plugin's usage. 
-										// All credit for this code segment goes to dekvall.
+										// All credit for the original code goes to dekvall.
 										clientThread.invoke(() ->
 										{
 											createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, members, memberJoinDates);
