@@ -747,13 +747,18 @@ public class SpectralClanMgmtButton
 						{
 							int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedChangedMember).getRank()).getId();
 							
-							if (memberRank != 9 && memberRank != -1)
+							if (memberRank != 9 && memberRank != -1  && memberRank != -3 && memberRank != -4 && memberRank != 264 && memberRank != 252)
 							{
 								memberType = "main";
 							}
 							else if (memberRank == 9)
 							{
 								memberType = "alt";
+							}
+							else if (memberRank == -3 || memberRank == -4 || memberRank == 264 || memberRank == 252)
+							{
+								// Since admin members usually have the same rank for all their accts, the member type could be main or alt for theirs.
+								memberType = "both";
 							}
 							else if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
 							{
