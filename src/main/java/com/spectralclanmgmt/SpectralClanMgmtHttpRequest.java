@@ -84,7 +84,6 @@ public class SpectralClanMgmtHttpRequest
 						wr.close();
 						
 						int responseCode = con.getResponseCode();
-						System.out.println("Response code: " + responseCode);
 						
 						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
 						String inputLine;
@@ -97,12 +96,18 @@ public class SpectralClanMgmtHttpRequest
 						
 						incoming.close();
 						
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						String status = resp.get("status").getAsString();
-						String data = resp.get("data").getAsString();
-						
-						responseReceived("add-new", status, data);
-						
+						if (responseCode == 200)
+						{
+							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+							String status = resp.get("status").getAsString();
+							String data = resp.get("data").getAsString();
+							
+							responseReceived("add-new", status, data);
+						}
+						else
+						{
+							responseReceived("add-new", "failure", "Something went wrong.");
+						}
 					}
 					catch (Exception e)
 					{
@@ -168,7 +173,6 @@ public class SpectralClanMgmtHttpRequest
 						wr.close();
 						
 						int responseCode = con.getResponseCode();
-						System.out.println("Response code: " + responseCode);
 						
 						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
 						String inputLine;
@@ -181,11 +185,18 @@ public class SpectralClanMgmtHttpRequest
 						
 						incoming.close();
 						
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						String status = resp.get("status").getAsString();
-						String data = resp.get("data").getAsString();
-						
-						responseReceived("add-alt", status, data);
+						if (responseCode == 200)
+						{
+							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+							String status = resp.get("status").getAsString();
+							String data = resp.get("data").getAsString();
+							
+							responseReceived("add-alt", status, data);
+						}
+						else
+						{
+							responseReceived("add-alt", "failure", "Something went wrong.");
+						}
 					}
 					catch (Exception e)
 					{
@@ -252,7 +263,6 @@ public class SpectralClanMgmtHttpRequest
 						wr.close();
 						
 						int responseCode = con.getResponseCode();
-						System.out.println("Response code: " + responseCode);
 						
 						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
 						String inputLine;
@@ -265,11 +275,18 @@ public class SpectralClanMgmtHttpRequest
 						
 						incoming.close();
 						
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						String status = resp.get("status").getAsString();
-						String data = resp.get("data").getAsString();
-						
-						responseReceived("name-change", status, data);
+						if (responseCode == 200)
+						{
+							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+							String status = resp.get("status").getAsString();
+							String data = resp.get("data").getAsString();
+							
+							responseReceived("name-change", status, data);
+						}
+						else
+						{
+							responseReceived("name-change", "failure", "Something went wrong.");
+						}
 					}
 					catch (Exception e)
 					{
