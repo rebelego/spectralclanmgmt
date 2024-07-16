@@ -45,9 +45,8 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
-	
-	
 	// This is the postRequestAsync method for the Discord-related commands.
+	// It sends the player's in-game name and a string value (not related to the player) to the clan's Discord web server.
 	protected void postRequestAsync(String commandUsed, String localPlayer, int chatType, int chatTarget)
 	{
 		if (executorService != null)
@@ -128,6 +127,7 @@ public class SpectralClanMgmtHttpRequest
 	}
 	
 	// This is the non-admin postRequestAsync method.
+	// It sends the player's in-game name and several string values (not related to the player) to the clan's web app.
 	protected void postRequestAsync(String task, Optional<String> localPlayer, Optional<String> source, Optional<Integer> chatType, Optional<Integer> chatTarget)
 	{
 		String src = source.orElse("");
@@ -314,6 +314,13 @@ public class SpectralClanMgmtHttpRequest
 	}
 	
 	// This is the admin postRequestAsync method.
+	// There are 3 http requests that each include different data that could be sent through this method.
+	// 1. It will send the in-game name of a selected clan member along with their clan join date to the clan's web app.
+	// 2. It will send the in-game name of a selected clan member along with their clan join date, 
+	// along with the in-game name of another selected clan member, to the clan's web app.
+	// 3. It will send the current in-game name, the previous in-game name of a selected clan member, and a string value to the clan's web app.
+	// Although the string value is related to the player, it's for a value defined by the clan 
+	// and not a personally identifying value linked to the player's data. The string value will either be 'main' or 'alt'.
 	protected void postRequestAsync(String task, String firstArg, String secondArg, Optional<String> thirdArg)
 	{
 		if (executorService != null)
