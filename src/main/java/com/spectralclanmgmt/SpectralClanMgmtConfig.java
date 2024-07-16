@@ -9,12 +9,50 @@ public interface SpectralClanMgmtConfig extends Config
 {
 	@ConfigItem(
 	keyName = "scriptURL",
-	name = "Script URL",
-	description = "The URL of the web app for the Spectral clan's script that modifies the clan's spreadsheet.",
+	name = "Spectral Web App URL",
+	description = "The URL of Spectral's web app for receiving POST requests from this plugin.",
 	position = 0
 	)
 	default String scriptURL()
 	{
 		return "";
 	}
+	
+	@ConfigItem(
+	keyName = "adminScriptURL",
+	name = "",
+	description = "",
+	hidden = true
+	)
+	default String adminScriptURL()
+	{
+		return "";
+	}
+	
+	@ConfigItem(
+	keyName = "adminScriptURL",
+	name = "",
+	description = "",
+	hidden = true
+	)
+	void setAdminScriptURL(String URL);
+	
+	@ConfigItem(
+	keyName = "spectralDiscordAppURL",
+	name = "",
+	description = "",
+	hidden = true
+	)
+	default String spectralDiscordAppURL()
+	{
+		return "";
+	}
+	
+	@ConfigItem(
+	keyName = "spectralDiscordAppURL",
+	name = "",
+	description = "",
+	hidden = true
+	)
+	void setSpectralDiscordAppURL(String URL);
 }

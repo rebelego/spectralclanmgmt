@@ -4,14 +4,16 @@ import net.runelite.api.clan.ClanSettings;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.api.*;
 import net.runelite.api.widgets.*;
+import net.runelite.client.util.Text;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 
 public class SpectralClanMgmtButton
 {
-	public SpectralClanMgmtPlugin spectralClanMgmtPlugin;
+	private SpectralClanMgmtPlugin spectralClanMgmtPlugin;
 	private final Client client;
 	private ClanSettings clanSettings;
 	private SpectralClanMgmtHttpRequest spectralClanMgmtHttpRequest;
@@ -36,7 +38,7 @@ public class SpectralClanMgmtButton
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
 	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
 	
-	public SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtHttpRequest httpRequest)
+	protected SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtHttpRequest httpRequest)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
@@ -299,25 +301,6 @@ public class SpectralClanMgmtButton
 		}
 	}
 	
-	// Because sometimes a space will be a non-breaking one instead, so when the names passed to the web app script
-	// and checked against the member names on the spreadsheet, even if there is a matching name, it'll return false.
-	// To fix that, I replace those non-breaking spaces when it's time to export.
-	private String replaceBadChars(String playerName)
-	{
-		char[] chars = playerName.toCharArray();
-		
-		for (int i = 0; i < chars.length; i++)
-		{
-			if ((int) chars[i] == 160)
-			{
-				chars[i] = (char)32;
-			}
-		}
-		
-		String newPlayerName = new String(chars);
-		return newPlayerName;
-	}
-	
 	// The script's URL needs to be set in the plugin's settings, and be a valid URL, 
 	// to get to the inner code where the HttpRequest will be created.
 	// Otherwise, they'll see a prompt to set the URL and the entire process will be aborted.
@@ -326,7 +309,7 @@ public class SpectralClanMgmtButton
 	private void exportMember()
 	{
 		// Before we proceed, we'll check that the script's URL is set and valid.
-		if (spectralClanMgmtPlugin.checkURL() == true)
+		if (spectralClanMgmtPlugin.checkURL("admin"))
 		{
 			// An extra check, just in case...
 			if (spectralClanMgmtHttpRequest.isReady())
@@ -336,32 +319,32 @@ public class SpectralClanMgmtButton
 				if (task.equals("add-new"))
 				{
 					String tempPlayerName = newMemberName;
-					newMemberName = replaceBadChars(tempPlayerName);
-					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName);
+					newMemberName = Text.sanitize(tempPlayerName);
+					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName, Optional.empty());
 				}
 				else if (task.equals("add-alt"))
 				{
 					String tempPlayerName = newMemberName;
-					newMemberName = replaceBadChars(tempPlayerName);
+					newMemberName = Text.sanitize(tempPlayerName);
 					tempPlayerName = mainMemberName;
-					mainMemberName = replaceBadChars(tempPlayerName);
+					mainMemberName = Text.sanitize(tempPlayerName);
 					
-					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, mainMemberName, newMemberName);
+					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, mainMemberName, Optional.of(newMemberName));
 				}
 				else if (task.equals("name-change"))
 				{
 					String tempPlayerName = memberCurrentName;
-					memberCurrentName = replaceBadChars(tempPlayerName);
+					memberCurrentName = Text.sanitize(tempPlayerName);
 					tempPlayerName = memberOldName;
-					memberOldName = replaceBadChars(tempPlayerName);
-					spectralClanMgmtHttpRequest.postRequestAsync(task, memberCurrentName, memberOldName, memberType, true);
+					memberOldName = Text.sanitize(tempPlayerName);
+					spectralClanMgmtHttpRequest.postRequestAsync(task, memberCurrentName, memberOldName, Optional.of(memberType));
 				}
 			}
 		}
 		else
 		{
 			chatboxPanelManager
-			.openTextMenuInput("Enter a valid URL for the script in the plugin's settings first.")
+			.openTextMenuInput("Enter a valid URL for Spectral's web app in the plugin's settings first.")
 			.option("OK", () -> removeListeners())
 			.build();
 		}
@@ -372,7 +355,7 @@ public class SpectralClanMgmtButton
 	// Once we've received the response, we'll store the parameters in local variables and shutdown the request's thread.
 	// The listeners are removed and the variables reset before the response is displayed in the chatbox.
 	// Additional text is appended before the response is displayed depending on the task's value if the export's status is "success".
-	public void exportDone(String tk, String stat, String dat)
+	protected void exportDone(String tk, String stat, String dat)
 	{
 		String status = stat;
 		String response = dat;
@@ -414,7 +397,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// This adds the click listeners to specific widgets in the member names column.
-	public void setListeners()
+	private void setListeners()
 	{
 		newMemberSelected = false;
 		altMemberSelected = false;
@@ -452,8 +435,9 @@ public class SpectralClanMgmtButton
 	
 	// This is essentially a reset, everything is cleared and the listeners are removed in preparation 
 	// for the button being clicked again or the members list widget being closed.
-	public void removeListeners()
+	private void removeListeners()
 	{
+		wasClicked = false;
 		newMemberSelected = false;
 		altMemberSelected = false;
 		mainMemberSelected = false;
@@ -464,7 +448,6 @@ public class SpectralClanMgmtButton
 		memberCurrentName = "";
 		memberOldName = "";
 		memberType = "";
-		wasClicked = false;
 		task = "";
 		
 		Widget[] memberWidgets = client.getWidget(693, 10).getChildren();
@@ -865,7 +848,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// Admin chose to add a new Main clan member
-	public void selectNew()
+	private void selectNew()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
 		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
@@ -889,7 +872,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// Admin chose to add a new Alt clan member
-	public void selectAlt()
+	private void selectAlt()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
 		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
@@ -914,7 +897,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// Get the Main for the new Alt clan member
-	public void selectMain()
+	private void selectMain()
 	{
 		// We would only reach this point after selectAlt has been run, 
 		// so the listeners would've already been added and we don't need the check here.
@@ -934,7 +917,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// Admin chose to export a name change
-	public void selectNameChange()
+	private void selectNameChange()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
 		// we need to check if the flag for them has been set, and if the listeners haven't been added, we'll add them.
@@ -960,7 +943,7 @@ public class SpectralClanMgmtButton
 	}
 	
 	// Admin selected No after choosing the Name Change option at the initial prompt.
-	public void abortNameChange()
+	private void abortNameChange()
 	{
 		chatboxPanelManager.close();
 		
@@ -978,7 +961,7 @@ public class SpectralClanMgmtButton
 	// before they can export the clan member's current and previous name to the script that will update the spreadsheet pages.
 	// There are checks that will happen prior to the export being posted to ensure the member is on their Friends list
 	// and has changed their name before.
-	public void nameChangeCheckPreReq()
+	private void nameChangeCheckPreReq()
 	{
 		chatboxPanelManager.close();
 		
@@ -991,12 +974,6 @@ public class SpectralClanMgmtButton
 			chatboxPanelManager.close(); 
 		})
 		.build();
-	}
-	
-	// Gets the value from the main class' checkURL method so we can use it in the enableButton method of this class.
-	private boolean urlCheck()
-	{
-		return spectralClanMgmtPlugin.checkURL();
 	}
 	
 	// I separated out the new member export options cause the chatbox looked too crowded when there were 4 options to click.
@@ -1016,54 +993,63 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
-	public void enableButton()
+	protected void enableButton()
 	{
 		textWidget.setText("<col=ffffff>" + "Export Clan Member" + "</col>");
 		
 		textWidget.setOnClickListener((JavaScriptCallback) e ->
 		{
-			if (spectralClanMgmtHttpRequest.isReady())
+			// Putting this check here in case the player was an admin-ranked member when the button was created
+			// and their rank is changed to a non-admin one while the button exists.
+			if (SpectralClanMgmtPlugin.isAdminRank(spectralClanMgmtPlugin.getLocalPlayerRank()))
 			{
 				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
 				// a prompt in the chatbox.
-				if (urlCheck())
+				if (spectralClanMgmtPlugin.checkURL("admin"))
 				{
-					// wasClicked is used as a flag that stops the button from reacting to additional clicks
-					// after the first click until the admin either finishes selecting and exporting a member,
-					// cancels, or causes the members list widget to close.
-					// We don't want them clicking the button then starting the export process, only to click the button
-					// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
-					if (wasClicked == false)
+					if (spectralClanMgmtHttpRequest.isReady())
 					{
-						wasClicked = true;
-						
+						// wasClicked is used as a flag that stops the button from reacting to additional clicks
+						// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
+						// We don't want them clicking the button then starting the export process, only to click the button
+						// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
+						if (wasClicked == false)
+						{
+							wasClicked = true;
+							
+							chatboxPanelManager
+							.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
+							.option("Member", () -> memberExport())
+							.option("Name Change", () -> nameChangeCheckPreReq())
+							.option("Cancel", () ->
+							{
+								wasClicked = false;
+								chatboxPanelManager.close();
+							})
+							.build();
+						}
+					}
+					else
+					{
+						// If this occurs, then the response from a post request hasn't been received yet.
+						// This will automatically be closed, if it's not already, when the request's response is received.
 						chatboxPanelManager
-						.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
-						.option("Member", () -> memberExport())
-						.option("Name Change", () -> nameChangeCheckPreReq())
-						.option("Cancel", () -> {
-							wasClicked = false;
-							chatboxPanelManager.close();
-						})
+						.openTextMenuInput("The previous export has not finished yet.")
+						.option("OK", () -> chatboxPanelManager.close())
 						.build();
 					}
 				}
 				else
 				{
 					chatboxPanelManager
-					.openTextMenuInput("Enter a valid URL for the script in the plugin's settings first.")
+					.openTextMenuInput("Enter a valid URL for Spectral's web app in the plugin's settings first.")
 					.option("OK", () -> chatboxPanelManager.close())
 					.build();
 				}
 			}
 			else
 			{
-				// If this occurs, then the response from a post request hasn't been received yet.
-				// This will automatically be closed, if it's not already, when the request's response is received.
-				chatboxPanelManager
-				.openTextMenuInput("The previous export has not finished yet.")
-				.option("OK", () -> chatboxPanelManager.close())
-				.build();
+				spectralClanMgmtPlugin.disableButton();
 			}
 		});
 	}
