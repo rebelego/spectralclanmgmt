@@ -55,6 +55,11 @@ public class SpectralClanMgmtChatCommandInputManager
 		eventBus.register(this);
 	}
 	
+	protected void shutdown()
+	{
+		eventBus.unregister(this);
+	}
+	
 	@Subscribe
 	private void onScriptCallbackEvent(ScriptCallbackEvent event)
 	{

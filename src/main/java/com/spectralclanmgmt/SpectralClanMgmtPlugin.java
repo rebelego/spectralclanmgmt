@@ -113,23 +113,27 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.info("Spectral Clan Mgmt Plugin started!");
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
 		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
 		clanChatCommandManager.registerCommandAsync(MOD_COMMAND, this::getMod);
 		clanChatCommandManager.registerCommandAsync(RECRUIT_COMMAND, this::getRecruit);
 		clanChatCommandManager.registerCommandAsync(SPECTRAL_COMMAND, this::getSpectral);
+		log.info("Spectral Clan Mgmt Plugin started!");
 	}
 	
 	@Override
 	protected void shutDown() throws Exception
 	{
-		log.info("Spectral Clan Mgmt Plugin stopped!");
+		chatboxPanelManager.shutdown();
+		clanChatCommandManager.shutdown();
+		cmdMgr.shutdown();
 		clanChatCommandManager.unregisterCommand(MOD_COMMAND);
 		clanChatCommandManager.unregisterCommand(RECRUIT_COMMAND);
 		clanChatCommandManager.unregisterCommand(SPECTRAL_COMMAND);
 		spectralPhrases = null;
 		httpRequest.shutdown();
+		log.info("Spectral Clan Mgmt Plugin stopped!");
+		
 	}
 	
 	@Subscribe

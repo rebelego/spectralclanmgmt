@@ -49,6 +49,8 @@ The following conditions must be met for the commands to work:
 @Singleton
 public class SpectralClanMgmtChatCommandManager
 {
+	private final EventBus eventBus;
+	
 	private final Map<String, SpectralClanMgmtChatCommand> commands = new ConcurrentHashMap<>();
 	
 	private final ScheduledExecutorService scheduledExecutorService;
@@ -58,7 +60,13 @@ public class SpectralClanMgmtChatCommandManager
 	{
 		// unused chatInputManager parameter must exist to cause it to be instantiated by guice
 		this.scheduledExecutorService = scheduledExecutorService;
+		this.eventBus = eventBus;
 		eventBus.register(this);
+	}
+	
+	protected void shutdown()
+	{
+		eventBus.unregister(this);
 	}
 	
 	protected void registerCommandAsync(String command, BiConsumer<SpectralClanMgmtChatboxCommandInput, String> execute)

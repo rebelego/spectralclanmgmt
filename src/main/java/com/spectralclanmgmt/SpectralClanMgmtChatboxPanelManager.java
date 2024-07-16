@@ -87,6 +87,11 @@ public class SpectralClanMgmtChatboxPanelManager
 		eventBus.register(this);
 	}
 	
+	protected void shutdown()
+	{
+		eventBus.unregister(this);
+	}
+	
 	public void close()
 	{
 		clientThread.invokeLater(this::unsafeCloseInput);
