@@ -1,8 +1,6 @@
 package com.spectralclanmgmt;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import java.io.BufferedReader;
@@ -45,44 +43,33 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
-	// This is the postRequestAsync method for the Discord-related commands.
-	// It sends the player's in-game name and a string value (not related to the player) to the clan's Discord web server.
-	protected void postRequestAsync(String commandUsed, String localPlayer, int chatType, int chatTarget)
+	// For getting the permissions, config links, and phrases all at once.
+	// This will be called after start up and when a command is used and it's been at least 5 minutes since the permissions were last checked.
+	protected void getRequestAsyncPluginData(String configLink, String player, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
 	{
 		if (executorService != null)
 		{
-			// On the off-chance someone stupidly changes the value for the URL to something invalid, we'll check again here before executing.
-			if (spectralClanMgmtPlugin.checkURL("discord"))
+			executorService.execute(() ->
 			{
-				executorService.execute(() ->
+				SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
+				
+				try
 				{
-					try
+					// URL of the web app with parameters for GET request.
+					String url = String.format("%s?configLink=%s&player=%s",
+					config.scriptURL(),
+					URLEncoder.encode(configLink, "UTF-8"),
+					URLEncoder.encode(player, "UTF-8"));
+					
+					URL obj = new URL(url);
+					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
+					
+					con.setRequestMethod("GET");
+					
+					int responseCode = con.getResponseCode();
+					
+					if (responseCode == 200)
 					{
-						// URL of the web app for the script.
-						String url = config.spectralDiscordAppURL();
-						StringBuilder postData = new StringBuilder();
-						String command = commandUsed.substring(1);
-						
-						postData.append("{");
-						postData.append("\"commandUsed\": \"").append(command).append("\", ");
-						postData.append("\"player\": \"").append(localPlayer).append("\", ");
-						postData.append("}");
-						
-						String payload = postData.toString();
-						
-						URL obj = new URL(url);
-						HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-						
-						con.setRequestMethod("POST");
-						con.setRequestProperty("Content-Type", "application/json");
-						
-						con.setDoOutput(true);
-						OutputStream output = con.getOutputStream();
-						byte[] input = payload.getBytes(StandardCharsets.UTF_8);
-						output.write(input, 0, input.length);
-						
-						int responseCode = con.getResponseCode();
-						
 						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
 						String inputLine;
 						StringBuffer response = new StringBuffer();
@@ -94,234 +81,80 @@ public class SpectralClanMgmtHttpRequest
 						
 						incoming.close();
 						
-						if (responseCode == 200)
+						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+						boolean permission = resp.get("permission").getAsBoolean();
+						String phraseList = resp.get("phrases").getAsString();
+						JsonArray conLink = resp.get("configLink").getAsJsonArray();
+						String[] links = new String[conLink.size()];
+						
+						if (configLink.equalsIgnoreCase("discord"))
 						{
-							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-							String status = resp.get("status").getAsString();
-							String data = resp.get("data").getAsString();
-							responseReceived(status, chatType, chatTarget, data, commandUsed);
+							links[0] = String.valueOf(conLink.get(0));
+						}
+						else if (configLink.equalsIgnoreCase("both"))
+						{
+							links[0] = String.valueOf(conLink.get(0));
+							links[1] = String.valueOf(conLink.get(1));
+						}
+						
+						if (chatboxCommandInput == null)
+						{
+							responseReceivedPluginData("success", permission, links, phraseList, Optional.empty());
 						}
 						else
 						{
-							String data = "Something went wrong. The Discord app couldn't process the request. Contact the developer about this issue.";
-							responseReceived("failure", chatType, chatTarget, data, commandUsed);
+							responseReceivedPluginData("success", permission, links, phraseList, Optional.of(chatboxCommandInput));
 						}
 					}
-					catch (Exception e)
+					else
 					{
-						e.printStackTrace();
+						if (chatboxCommandInput == null)
+						{
+							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.empty());
+						}
+						else
+						{
+							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.of(chatboxCommandInput));
+						}
 					}
-				});
-			}
-			else
-			{
-				String data = "The URL for Spectral's Discord Web API is either missing or not valid. Contact the developer about this issue.";
-				responseReceived("failure", chatType, chatTarget, data, commandUsed);
-			}
-		}
-		else
-		{
-			String data = "The executor wasn't initialized. Contact the developer about this issue.";
-			responseReceived("failure", chatType, chatTarget, data, commandUsed);
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			});
 		}
 	}
 	
-	// This is the non-admin postRequestAsync method.
-	// It sends the player's in-game name and several string values (not related to the player) to the clan's web app.
-	protected void postRequestAsync(String task, Optional<String> localPlayer, Optional<String> source, Optional<Integer> chatType, Optional<Integer> chatTarget)
+	protected void responseReceivedPluginData(String status, boolean perm, String[] configLinks, String phrases, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
 	{
-		String src = source.orElse("");
-		int cType = chatType.orElse(-1);
-		int cTarget = chatTarget.orElse(-1);
-		String secondArg = localPlayer.orElse("");
+		SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
 		
-		if (executorService != null)
+		if (chatboxCommandInput != null)
 		{
-			// On the off-chance someone stupidly changes the value for the URL to something invalid, we'll check again here before executing.
-			if (spectralClanMgmtPlugin.checkURL("normal"))
-			{
-				executorService.execute(() ->
-				{
-					try
-					{
-						// URL of the web app for the script.
-						String url = config.scriptURL();
-						
-						StringBuilder postData = new StringBuilder();
-						
-						if (task.equalsIgnoreCase("permission") || task.equalsIgnoreCase("config"))
-						{
-							postData.append(URLEncoder.encode("task", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(task, "UTF-8"));
-							postData.append('&');
-							if (task.equalsIgnoreCase("permission"))
-							{
-								postData.append(URLEncoder.encode("player", "UTF-8"));
-							}
-							else if (task.equalsIgnoreCase("config"))
-							{
-								postData.append(URLEncoder.encode("configlink", "UTF-8"));
-							}
-							postData.append('=');
-							postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-						}
-						else if (task.equalsIgnoreCase("phrases"))
-						{
-							postData.append(URLEncoder.encode("task", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(task, "UTF-8"));
-						}
-						
-						URL obj = new URL(url);
-						HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-						
-						con.setRequestMethod("POST");
-						con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-						
-						con.setDoOutput(true);
-						DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-						wr.writeBytes(postData.toString());
-						wr.flush();
-						wr.close();
-						
-						int responseCode = con.getResponseCode();
-						
-						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
-						String inputLine;
-						StringBuffer response = new StringBuffer();
-						
-						while ((inputLine = incoming.readLine()) != null)
-						{
-							response.append(inputLine);
-						}
-						
-						incoming.close();
-						
-						if (responseCode == 200)
-						{
-							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-							String status = resp.get("status").getAsString();
-							
-							if (status.equalsIgnoreCase("success"))
-							{
-								if (task.equalsIgnoreCase("permission"))
-								{
-									boolean data = resp.get("data").getAsBoolean();
-									responseReceived(data, src, cType, cTarget);
-								}
-								else if (task.equalsIgnoreCase("phrases"))
-								{
-									String data = resp.get("data").getAsString();
-									responseReceived(status, data, src, cType, cTarget);
-								}
-								else if (task.equalsIgnoreCase("config"))
-								{
-									if (secondArg.equalsIgnoreCase("discord"))
-									{
-										String data = resp.get("data").getAsString();
-										String[] links = new String[] { data };
-										responseReceived(secondArg, src, links);
-									}
-									else if (secondArg.equalsIgnoreCase("both"))
-									{
-										JsonArray data = resp.get("data").getAsJsonArray();
-										String discord = data.get(0).getAsString();
-										String admin = data.get(1).getAsString();
-										String[] links = new String[] { discord, admin };
-										responseReceived(secondArg, src, links);
-									}
-								}
-							}
-							else
-							{
-								if (task.equalsIgnoreCase("permission"))
-								{
-									boolean data = false;
-									responseReceived(data, src, cType, cTarget);
-								}
-								else if (task.equalsIgnoreCase("phrases"))
-								{
-									String data = "";
-									responseReceived(status, data, src, cType, cTarget);
-								}
-								else if (task.equalsIgnoreCase("config"))
-								{
-									String[] links = new String[]{};
-									responseReceived(secondArg, src, links);
-								}
-							}
-						}
-						else
-						{
-							if (task.equalsIgnoreCase("permission"))
-							{
-								responseReceived(false, src, cType, cTarget);
-							}
-							else if (task.equalsIgnoreCase("phrases"))
-							{
-								String data = "";
-								responseReceived("failure", data, src, cType, cTarget);
-							}
-							else if (task.equalsIgnoreCase("config"))
-							{
-								String[] links = new String[]{};
-								responseReceived(secondArg, src, links);
-							}
-						}
-					}
-					catch (Exception e)
-					{
-						e.printStackTrace();
-					}
-				});
-			}
-			else
-			{
-				if (task.equalsIgnoreCase("permission"))
-				{
-					responseReceived(false, src, cType, cTarget);
-				}
-				else if (task.equalsIgnoreCase("phrases"))
-				{
-					String data = "";
-					responseReceived("failure", data, src, cType, cTarget);
-				}
-				else if (task.equalsIgnoreCase("config"))
-				{
-					String[] links = new String[]{};
-					responseReceived(secondArg, src, links);
-				}
-			}
+			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.of(chatboxCommandInput));
 		}
 		else
 		{
-			if (task.equalsIgnoreCase("permission"))
-			{
-				responseReceived(false, src, cType, cTarget);
-			}
-			else if (task.equalsIgnoreCase("phrases"))
-			{
-				String data = "";
-				responseReceived("failure", data, src, cType, cTarget);
-			}
-			else if (task.equalsIgnoreCase("config"))
-			{
-				String[] links = new String[]{};
-				responseReceived(secondArg, src, links);
-			}
+			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.empty());
 		}
 	}
 	
-	// This is the admin postRequestAsync method.
-	// There are 3 http requests that each include different data that could be sent through this method.
-	// 1. It will send the in-game name of a selected clan member along with their clan join date to the clan's web app.
-	// 2. It will send the in-game name of a selected clan member along with their clan join date, 
-	// along with the in-game name of another selected clan member, to the clan's web app.
-	// 3. It will send the current in-game name, the previous in-game name of a selected clan member, and a string value to the clan's web app.
-	// Although the string value is related to the player, it's for a value defined by the clan 
-	// and not a personally identifying value linked to the player's data. The string value will either be 'main' or 'alt'.
-	protected void postRequestAsync(String task, String firstArg, String secondArg, Optional<String> thirdArg)
+	/* 
+	This is for the Admin-related export tasks in the SpectralClanMgmtButton class (new member additions and name changes).
+	
+	 1. New Main member: It will send the in-game name of the new clan member, their clan join date, and the admin's name to the clan's web app.
+	 2. New Alt Member: It will send the in-game name of the new clan member, their clan join date, 
+	    the name of the new member's Main in the clan, and the admin's name to the clan's web app.
+	 3. Member Name Change: It will send the current in-game name and the previous in-game name of the selected clan member, 
+	    and their clan member type ('main', 'alt', 'both') to the clan's web app.
+	    The member type is not a personally identifying value linked to the player's data.
+	    
+	 * firstArg will either be the new member's join date OR the current name of a member name change.
+	 * secondArg will either be the name of the new Main OR the name of the new Alt's Main OR the previous name of a member name change.
+	 * thirdArg will either be the name of the local player OR the name of the new Alt member OR member type ('main', 'alt', or 'both') from name change export.
+	 */
+	protected void postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg)
 	{
 		if (executorService != null)
 		{
@@ -334,8 +167,6 @@ public class SpectralClanMgmtHttpRequest
 					{
 						// URL of the web app for the script.
 						String url = config.adminScriptURL();
-						
-						String optionalThirdArg = thirdArg.orElse("");
 						
 						StringBuilder postData = new StringBuilder();
 						
@@ -352,6 +183,10 @@ public class SpectralClanMgmtHttpRequest
 							postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
 							postData.append('=');
 							postData.append(URLEncoder.encode(secondArg, "UTF-8"));
+							postData.append('&');
+							postData.append(URLEncoder.encode("admin", "UTF-8"));
+							postData.append('=');
+							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
 						}
 						else if (task.equalsIgnoreCase("add-alt"))
 						{
@@ -369,7 +204,7 @@ public class SpectralClanMgmtHttpRequest
 							postData.append('&');
 							postData.append(URLEncoder.encode("altPlayer", "UTF-8"));
 							postData.append('=');
-							postData.append(URLEncoder.encode(optionalThirdArg, "UTF-8"));
+							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
 						}
 						else if (task.equalsIgnoreCase("name-change"))
 						{
@@ -387,7 +222,7 @@ public class SpectralClanMgmtHttpRequest
 							postData.append('&');
 							postData.append(URLEncoder.encode("memberType", "UTF-8"));
 							postData.append('=');
-							postData.append(URLEncoder.encode(optionalThirdArg, "UTF-8"));
+							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
 						}
 						
 						URL obj = new URL(url);
@@ -421,12 +256,12 @@ public class SpectralClanMgmtHttpRequest
 							String status = resp.get("status").getAsString();
 							String data = resp.get("data").getAsString();
 							
-							responseReceived(task, status, data);
+							responseReceivedAdmin(task, status, data);
 						}
 						else
 						{
 							String data = "Something went wrong. Contact the developer about this issue.";
-							responseReceived(task, "failure", data);
+							responseReceivedAdmin(task, "failure", data);
 						}
 					}
 					catch (Exception e)
@@ -438,33 +273,17 @@ public class SpectralClanMgmtHttpRequest
 			else
 			{
 				String data = "The URL for Spectral's web app is either missing or not valid.";
-				responseReceived("", "failure", data);
+				responseReceivedAdmin("", "failure", data);
 			}
 		}
 		else
 		{
 			String data = "The executor wasn't initialized. Contact the developer about this issue.";
-			responseReceived("", "failure", data);
+			responseReceivedAdmin("", "failure", data);
 		}
 	}
 	
-	
-	// This method is for handling the returned value from the postRequestAsync method for Discord-related commands.
-	private void responseReceived(String status, int cType, int cTarget, String data, String commandUsed)
-	{
-		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call finishDiscordCommands.
-		if (client.getGameState() == GameState.LOGGED_IN)
-		{
-			spectralClanMgmtPlugin.finishDiscordCommands(status, data, commandUsed, cType, cTarget);
-		}
-		else
-		{
-			shutdown();
-		}
-	}
-	
-	// This method is for handling the returned value from the admin postRequestAsync method.
-	private void responseReceived(String task, String status, String data)
+	private void responseReceivedAdmin(String task, String status, String data)
 	{
 		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call exportDone.
 		if (client.getGameState() == GameState.LOGGED_IN)
@@ -499,41 +318,86 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
-	// This method is for handling the returned value from the non-admin postRequestAsync method. The result of the config links check is passed here.
-	private void responseReceived(String configLink, String src, String[] links)
+	/*
+	This is the postRequestAsync method for the Discord-related commands. The requests are sent to Spectral's Discord web api.
+	The task argument is 'discord', it's used for routing the request in the web api.
+	The chatboxCommandInput object is used to retrieve the command the local player sent to the chat. The object itself won't be included in the request.
+	The player argument is for the name of the local player.
+	The task and player arguments, along with the command text, are included as parameters in the post request.
+	*/
+	protected void postRequestAsyncRecruitMod(String task, SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String player)
 	{
-		
-		spectralClanMgmtPlugin.setConfigLinks(configLink, links, Optional.of(src));
+		if (executorService != null)
+		{
+			executorService.execute(() ->
+			{
+				try
+				{
+					// URL of the web app for the script.
+					String url = config.spectralDiscordAppURL();
+					String command = chatboxCommandInput.getSpectralCommand().substring(1);
+					String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
+					
+					URL obj = new URL(url);
+					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
+					
+					con.setRequestMethod("POST");
+					con.setRequestProperty("Content-Type", "application/json");
+					
+					con.setDoOutput(true);
+					OutputStream stream = con.getOutputStream();
+					byte[] payloadBytes = payload.getBytes("utf-8");
+					stream.write(payloadBytes, 0, payloadBytes.length);
+					stream.flush();
+					stream.close();
+					
+					int responseCode = con.getResponseCode();
+					
+					BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
+					String inputLine;
+					StringBuffer response = new StringBuffer();
+					
+					while ((inputLine = incoming.readLine()) != null)
+					{
+						response.append(inputLine);
+					}
+					
+					incoming.close();
+					
+					if (responseCode == 200)
+					{
+						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+						String status = resp.get("status").getAsString();
+						String data = resp.get("data").getAsString();
+						responseReceivedRecruitMod(status, data, chatboxCommandInput);
+					}
+					else
+					{
+						String data = "Something went wrong. The Discord app couldn't process the request. Contact the developer about this issue.";
+						responseReceivedRecruitMod("failure", data, chatboxCommandInput);
+					}
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			});
+		}
 	}
 	
-	// This method is for handling the returned value from the non-admin postRequestAsync method. The result of the permissions check is passed here.
-	private void responseReceived(boolean data, String src, int cType, int cTarget)
+	// This receives the returned value from the postRequestAsyncRecruitMod method.
+	private void responseReceivedRecruitMod(String status, String data, SpectralClanMgmtChatboxCommandInput chatboxCommandInput)
 	{
-		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call getCommandPermission to pass back the result of the permission check.
+		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call setRecruitMod.
 		if (client.getGameState() == GameState.LOGGED_IN)
 		{
-			spectralClanMgmtPlugin.getCommandPermission(data, src, cType, cTarget);
+			spectralClanMgmtPlugin.setRecruitMod(status, data, chatboxCommandInput);
 		}
 		else
 		{
 			shutdown();
 		}
 	}
-	
-	// This method is for handling the returned value from the non-admin postRequestAsync method. The result of the phrases check is passed here.
-	private void responseReceived(String status, String data, String src, int cType, int cTarget)
-	{
-		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call getPhrases to populate the spectralPhrases array with values.
-		if (client.getGameState() == GameState.LOGGED_IN)
-		{
-			spectralClanMgmtPlugin.getPhrases(status, data, src, cType, cTarget);
-		}
-		else
-		{
-			shutdown();
-		}
-	}
-	
 	
 	protected void shutdown()
 	{

@@ -30,20 +30,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiConsumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
 /*
-Spectral's commands are coded to be handled similar to the way the ::bank command is.
-When one of Spectral's registered commands is sent from the chatbox by the player and all of the required conditions are met,
-the command will be consumed and another string value will be sent to the chat in its place.
-
-The following conditions must be met for the commands to work:
+The following conditions must be met for the Spectral's commands to be used:
 (It's a given that this plugin has to be installed for the commands to work).
 1. The local player must be a ranked member of the Spectral clan (players with the guest rank in the clan chat cannot use the commands).
 2. The command must be sent in the clan chat.
-3. For the !spectral command, the local player must have permission to use the command. 
-   Permission is checked at startup and each time the !spectral command is used.
+3. The local player must have permission to use the commands.
+There's a 30 second cooldown before a command can be used again.
 */
 
 @Singleton
@@ -55,11 +52,13 @@ public class SpectralClanMgmtChatCommandManager
 	
 	private final ScheduledExecutorService scheduledExecutorService;
 	
+	private final ClientThread clientThread;
+	
 	@Inject
-	private SpectralClanMgmtChatCommandManager(EventBus eventBus, SpectralClanMgmtChatCommandInputManager chatInputManager, ScheduledExecutorService scheduledExecutorService)
+	private SpectralClanMgmtChatCommandManager(ClientThread clientThread, EventBus eventBus, SpectralClanMgmtChatCommandInputManager chatInputManager, ScheduledExecutorService scheduledExecutorService)
 	{
-		// unused chatInputManager parameter must exist to cause it to be instantiated by guice
 		this.scheduledExecutorService = scheduledExecutorService;
+		this.clientThread = clientThread;
 		this.eventBus = eventBus;
 		eventBus.register(this);
 	}
@@ -69,12 +68,12 @@ public class SpectralClanMgmtChatCommandManager
 		eventBus.unregister(this);
 	}
 	
-	protected void registerCommandAsync(String command, BiConsumer<SpectralClanMgmtChatboxCommandInput, String> execute)
+	protected void registerSpectralCommandAsync(String command, BiConsumer<SpectralClanMgmtChatboxCommandInput, String> execute)
 	{
 		commands.put(command.toLowerCase(), new SpectralClanMgmtChatCommand(command, true, execute));
 	}
 	
-	protected void unregisterCommand(String command)
+	protected void unregisterSpectralCommand(String command)
 	{
 		commands.remove(command.toLowerCase());
 	}
@@ -86,12 +85,11 @@ public class SpectralClanMgmtChatCommandManager
 		final String spectralCommand = chatboxInput.getSpectralCommand();
 		String command = "";
 		
-		if (!spectralCommand.equalsIgnoreCase(""))
+		if (!spectralCommand.trim().equalsIgnoreCase(""))
 		{
-			// Remember that sCommand variable from the SpectralChatCommandInputManager class?
-			// This is where the sCommand variable from the SpectralChatCommandInputManager class is needed. 
-			// It ensures that spectral's commands won't appear in the chat or be further processed if all the required conditions aren't met.
-			if (spectralCommand.equalsIgnoreCase("ignore"))
+			// If spectralCommand is 'ignore', the one of spectral's commands was used in a situation where it's not allowed to be,
+			// so we want to consume the command so it won't end up in the chat and return.
+			if (spectralCommand.trim().equalsIgnoreCase("ignore"))
 			{
 				chatboxInput.consume();
 				return;
@@ -113,16 +111,13 @@ public class SpectralClanMgmtChatCommandManager
 			return;
 		}
 		
-		if (chatCommand.isAsync())
-		{
+		// Since these are for spectral's commands, we need to wait until the checks are done before the chatboxInput (unmodified)
+		// is sent to the chat. We have to consume the chatboxInput instance here because we don't want it to be sent the chat yet,
+		// and if we don't consume it here, it'll end up being sent twice, or it'll be sent once when it shouldn't have.
+		clientThread.invoke(() -> { 
 			scheduledExecutorService.execute(() -> chatCommand.getExecute().accept(chatboxInput, message));
-			chatboxInput.consume();
-		}
-		else
-		{
-			chatCommand.getExecute().accept(chatboxInput, message);
-			chatboxInput.consume();
-		}
+			chatboxInput.consume(); 
+		});
 	}
 	
 	private static String extractCommand(String message)

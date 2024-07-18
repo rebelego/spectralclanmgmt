@@ -40,8 +40,6 @@ import net.runelite.api.widgets.WidgetSizeMode;
 import net.runelite.api.widgets.WidgetTextAlignment;
 import net.runelite.client.input.KeyListener;
 
-// My own version of the ChatboxTextMenuInput class, because there were a few things I wanted to change for the chatbox messages
-// and the code was being a pain in the ass.
 public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatboxInput implements KeyListener
 {
 	@Data

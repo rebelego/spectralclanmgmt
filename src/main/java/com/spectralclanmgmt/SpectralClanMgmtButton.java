@@ -320,7 +320,8 @@ public class SpectralClanMgmtButton
 				{
 					String tempPlayerName = newMemberName;
 					newMemberName = Text.sanitize(tempPlayerName);
-					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, newMemberName, Optional.empty());
+					String localPlayerName = Text.sanitize(client.getLocalPlayer().getName());
+					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, newMemberDate, newMemberName, localPlayerName);
 				}
 				else if (task.equals("add-alt"))
 				{
@@ -329,7 +330,7 @@ public class SpectralClanMgmtButton
 					tempPlayerName = mainMemberName;
 					mainMemberName = Text.sanitize(tempPlayerName);
 					
-					spectralClanMgmtHttpRequest.postRequestAsync(task, newMemberDate, mainMemberName, Optional.of(newMemberName));
+					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, newMemberDate, mainMemberName, newMemberName);
 				}
 				else if (task.equals("name-change"))
 				{
@@ -337,7 +338,7 @@ public class SpectralClanMgmtButton
 					memberCurrentName = Text.sanitize(tempPlayerName);
 					tempPlayerName = memberOldName;
 					memberOldName = Text.sanitize(tempPlayerName);
-					spectralClanMgmtHttpRequest.postRequestAsync(task, memberCurrentName, memberOldName, Optional.of(memberType));
+					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, memberCurrentName, memberOldName, memberType);
 				}
 			}
 		}
@@ -367,15 +368,11 @@ public class SpectralClanMgmtButton
 		{
 			if (t.equals("add-new"))
 			{
-				response = response + "<br>Don't forget to update the member's Discord name and role!";
+				response = response + "<br>Go into Discord now and wait for the Spectral bot to ping you!";
 			}
-			else if (t.equals("add-alt"))
+			else if (t.equalsIgnoreCase("add-alt") || t.equalsIgnoreCase("name-change"))
 			{
-				response = response + "<br>Don't forget to add the alt to the Main's Discord name!";
-			}
-			else if (t.equals("name-change"))
-			{
-				response = response + "<br>Don't forget to update the member's Discord name!";
+				response = response + "<br>All done!";
 			}
 		}
 		
@@ -467,10 +464,11 @@ public class SpectralClanMgmtButton
 	
 	// The method for the click listeners on the member names child widgets of the member names column.
 	// Depending on the option the user first selected, different methods will be run.
-	// The user can either select a new main or a new alt (along with the new alt's main in the clan).
+	// The user can either select a new main or a new alt (along with the new alt's main in the clan), or a member for a name chang export.
 	// The first member selection is essentially the same, we use the value of j to get the index of the member's name in the hashmap. 
-	// Then we use the member's name to get their join date. The join date has already been converted into a date string for the EST/EDT timezone.
-	// As for the second part (for alts), it just retrieves the selected main's name from the hashmap, we don't need the alt's main's join date.
+	// For new member (Main or Alt) exports, we use the member's name to get their join date. 
+	// The join date has already been converted into a date string for the EST/EDT timezone.
+	// For selecting the Main member of a new Alt member export, we only need the selected main's name from the hashmap.
 	private void getSelectedMember(int j)
 	{
 		if (task.equals("add-new")) // adding a new main task
@@ -497,9 +495,15 @@ public class SpectralClanMgmtButton
 								
 								if (!selectedNewMemberName.equals("") && !selectedNewMemberDate.equals(""))
 								{
-									int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
+									int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
 									
-									if (mainMemberRank != 9 && mainMemberRank != -1)
+									if (memberRank == 9 || memberRank == -1) // 9 is for the Alt rank. -1 is for the Guest rank. Mains can't have either of these ranks.
+									{
+										// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
+										task = "invalid-new";
+										newMemberName = selectedNewMemberName;
+									}
+									else if (memberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(memberRank) || SpectralClanMgmtPlugin.isAdminRank(memberRank)))
 									{
 										// Flip the flag and set the local variable values to their corresponding global variables.
 										newMemberSelected = true;
@@ -507,31 +511,35 @@ public class SpectralClanMgmtButton
 										newMemberDate = selectedNewMemberDate;
 										// Proceed to the next step.
 										confirmSelection();
+										return;
 									}
-									else if (mainMemberRank == 9)
-									{
-										// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
-										task = "invalid-new";
-										newMemberName = selectedNewMemberName;
-										newMemberSelected = false;
-										newMemberDate = "";
-										// Proceed to the next step.
-										confirmSelection();
-									}
-								}
-								else // Something went wrong.
-								{
-									task = "error";
-									newMemberSelected = false;
-									newMemberName = "";
-									newMemberDate = "";
-									// Proceed to the next step.
-									confirmSelection();
 								}
 							}
 						}
 					}
 				}
+				
+				// We should only reach this point if the member selected wasn't a valid choice.
+				// If the task wasn't already changed, then it means the task's value is meant to be "error".
+				if (task.equalsIgnoreCase("add-new"))
+				{
+					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("add-new"))
+				{
+					if (task.equalsIgnoreCase("error"))
+					{
+						newMemberName = "";
+					}
+					
+					newMemberSelected = false;
+					newMemberDate = "";
+					// Proceed to the next step.
+					confirmSelection();
+					return;
+				}
+				
 			}
 		}
 		else if (task.equals("add-alt-get-new")) // first half of the add-alt overall task
@@ -556,86 +564,53 @@ public class SpectralClanMgmtButton
 								
 								if (selectedNewMemberName != "" && selectedNewMemberDate != "")
 								{
-									// Make sure the selected member's rank is the Alt rank (Gnome Child), because Alt member accounts have to have that rank.
-									int altMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
+									int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
 									
-									// Selected member has the Alt rank, we can proceed.
-									if (altMemberRank == 9)
+									// Check that the selected member has the required rank for Alts. 9 is the ID for the Alt rank's title.
+									if (memberRank == 9)
 									{
-										// Flip the flag and set the local variable values to their corresponding global variables.
 										altMemberSelected = true;
 										newMemberName = selectedNewMemberName;
 										newMemberDate = selectedNewMemberDate;
 										confirmSelection();
+										return;
 									}
-									else if (altMemberRank != 9)
+									else
 									{
-										// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
-										// This occurs if the admin selected a member that has a normal rank, which is a no-no for alts.
 										task = "invalid-alt";
-										// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
-										// but we want the selected name for the error message that's shown.
 										newMemberName = selectedNewMemberName;
-										altMemberSelected = false;
-										newMemberDate = "";
-										// Proceed to the next step.
-										confirmSelection();
 									}
 								}
-								else  // Something went wrong.
-								{
-									task = "error";
-									altMemberSelected = false;
-									newMemberName = "";
-									newMemberDate = "";
-									// Proceed to the next step.
-									confirmSelection();
-								}
-							}
-							else  // Something went wrong.
-							{
-								task = "error";
-								altMemberSelected = false;
-								newMemberName = "";
-								newMemberDate = "";
-								// Proceed to the next step.
-								confirmSelection();
 							}
 						}
-						else  // Something went wrong.
-						{
-							task = "error";
-							altMemberSelected = false;
-							newMemberName = "";
-							newMemberDate = "";
-							// Proceed to the next step.
-							confirmSelection();
-						}
-					}
-					else  // Something went wrong.
-					{
-						task = "error";
-						altMemberSelected = false;
-						newMemberName = "";
-						newMemberDate = "";
-						// Proceed to the next step.
-						confirmSelection();
 					}
 				}
-				else  // Something went wrong.
+				
+				// We should only reach this point if the member selected wasn't a valid choice.
+				// If the task wasn't already changed, then it means the task's value is meant to be "error".
+				if (task.equalsIgnoreCase("add-alt-get-new"))
 				{
 					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("add-alt-get-new"))
+				{
+					if (task.equalsIgnoreCase("error"))
+					{
+						newMemberName = "";
+					}
+					
 					altMemberSelected = false;
-					newMemberName = "";
 					newMemberDate = "";
 					// Proceed to the next step.
 					confirmSelection();
+					return;
 				}
 			}
 		}
 		else if (task.equals("add-alt-get-main")) // second half of the add-alt overall task
 		{
-			// If an alt member has been selected, but the alt's main hasn't been selected, this code segment will be run.
+			// If an Alt has been selected, but the Alt's Main hasn't been selected, this code segment will be run.
 			if (altMemberSelected == true && mainMemberSelected == false)
 			{
 				// j is for the position of the child widget in the children array. 
@@ -647,66 +622,50 @@ public class SpectralClanMgmtButton
 				{
 					if (clanmembers.size() > 0)
 					{
-						// For selecting an alt's main, we only want to get the name and store it in a local variable.
+						// For the Alt's Main, we only need its name.
 						String selectedMainMemberName = clanmembers.get(sn);
 						
 						if (!selectedMainMemberName.equals(""))
 						{
-							// Now I need to check the rank of the selected main for the alt, 
-							// because main accounts can't have the Guest rank (this was added just in case something bizarre happens 
-							// that makes this possible, it really shouldn't be) or the Gnome Child rank, since that's strictly for Alt accounts.
 							int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMainMemberName).getRank()).getId();
 							
-							if (mainMemberRank != 9 && mainMemberRank != -1)
+							// Check that the selected member has one of the ranks for Mains.
+							if (mainMemberRank == 9 || mainMemberRank == -1) // 9 is the ID for the Alt rank's title. -1 is the Guest rank's title. Mains can't have either of those ranks.
 							{
-								// The selected member for the main has a normal rank. Since we've selected both an alt and a main, 
-								// we set the task value to the value it needs to be at the end to signal it's time to export.
+								task = "invalid-main";
+								mainMemberName = selectedMainMemberName;
+							}
+							else if (mainMemberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(mainMemberRank) || SpectralClanMgmtPlugin.isAdminRank(mainMemberRank)))
+							{ // Have to include the check for Alt rank in the check here as well since it's a normal rank, but Mains can't have it.
 								task = "add-alt";
-								// Flip the flag and set the local variable values to their corresponding global variables.
 								mainMemberSelected = true;
 								mainMemberName = selectedMainMemberName;
 								// Proceed to the next step.
 								confirmSelection();
-							}
-							else if (mainMemberRank == 9)
-							{
-								// Update the task value so we'll pass the conditional check in confirmSelection for our error message.
-								// This will happen if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
-								task = "invalid-main";
-								// Store the local variable's value in its corresponding global variable. This will be reset when confirmSelection runs,
-								// but we want the selected name for the error message that's shown.
-								// Make sure the flag remains set to false.
-								mainMemberName = selectedMainMemberName;
-								mainMemberSelected = false;
-								// Proceed to the next step.
-								confirmSelection();
+								return;
 							}
 						}
-						else // Something went wrong.
-						{
-							task = "error";
-							mainMemberSelected = false;
-							mainMemberName = "";
-							// Proceed to the next step.
-							confirmSelection();
-						}
-					}
-					else // Something went wrong.
-					{
-						task = "error";
-						mainMemberSelected = false;
-						mainMemberName = "";
-						// Proceed to the next step.
-						confirmSelection();
 					}
 				}
-				else // Something went wrong.
+				
+				// We should only reach this point if the member selected wasn't a valid choice.
+				// If the task wasn't already changed, then it means the task's value is meant to be "error".
+				if (task.equalsIgnoreCase("add-alt-get-main"))
 				{
 					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("add-alt-get-main"))
+				{
+					if (task.equalsIgnoreCase("error"))
+					{
+						mainMemberName = "";
+					}
+					
 					mainMemberSelected = false;
-					mainMemberName = "";
 					// Proceed to the next step.
 					confirmSelection();
+					return;
 				}
 			}
 		}
@@ -730,22 +689,22 @@ public class SpectralClanMgmtButton
 						{
 							int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedChangedMember).getRank()).getId();
 							
-							if (memberRank != 9 && memberRank != -1  && memberRank != -3 && memberRank != -4 && memberRank != 264 && memberRank != 252)
+							if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
 							{
-								memberType = "main";
+								memberType = "";
 							}
 							else if (memberRank == 9)
 							{
 								memberType = "alt";
 							}
-							else if (memberRank == -3 || memberRank == -4 || memberRank == 264 || memberRank == 252)
+							else if (SpectralClanMgmtPlugin.isNormalRank(memberRank))
 							{
-								// Since admin members usually have the same rank for all their accts, the member type could be main or alt for theirs.
-								memberType = "both";
+								memberType = "main";
 							}
-							else if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
+							else if (SpectralClanMgmtPlugin.isAdminRank(memberRank)) // Admins
 							{
-								memberType = "";
+								// Since admin members usually have the same rank for all their accts, the member type could be main or alt.
+								memberType = "both";
 							}
 							
 							if (!memberType.equals(""))
@@ -766,88 +725,53 @@ public class SpectralClanMgmtButton
 											memberOldName = changedMember.getPrevName();
 											// Proceed to the next step.
 											confirmSelection();
+											return;
 										}
 										else // The member hasn't changed their name before.
 										{
 											task = "no-name-change";
-											changedMemberSelected = false;
 											memberCurrentName = selectedChangedMember;
-											memberOldName = "";
-											memberType = "";
-											// Proceed to the next step.
-											confirmSelection();
 										}
 									}
 									else // The member isn't on the admin's Friends list.
 									{
 										task = "not-friend";
-										changedMemberSelected = false;
 										memberCurrentName = selectedChangedMember;
-										memberOldName = "";
-										memberType = "";
-										// Proceed to the next step.
-										confirmSelection();
 									}
 								}
 								else // The admin's Friends list is empty.
 								{
 									task = "no-friends";
-									changedMemberSelected = false;
-									memberCurrentName = "";
-									memberOldName = "";
-									memberType = "";
-									// Proceed to the next step.
-									confirmSelection();
 								}
 							}
-							else
-							{
-								task = "error";
-								changedMemberSelected = false;
-								memberCurrentName = "";
-								memberOldName = "";
-								memberType = "";
-								// Proceed to the next step.
-								confirmSelection();
-							}
 						}
-						else // Something went wrong.
-						{
-							task = "error";
-							changedMemberSelected = false;
-							memberCurrentName = "";
-							memberOldName = "";
-							memberType = "";
-							// Proceed to the next step.
-							confirmSelection();
-						}
-					}
-					else // Something went wrong.
-					{
-						task = "error";
-						changedMemberSelected = false;
-						memberCurrentName = "";
-						memberOldName = "";
-						memberType = "";
-						// Proceed to the next step.
-						confirmSelection();
 					}
 				}
-				else // Something went wrong.
+				
+				if (task.equalsIgnoreCase("name-change"))
 				{
 					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("name-change"))
+				{
+					if (task.equalsIgnoreCase("error") || task.equalsIgnoreCase("no-friends"))
+					{
+						memberCurrentName = "";
+					}
+					
 					changedMemberSelected = false;
-					memberCurrentName = "";
 					memberOldName = "";
 					memberType = "";
 					// Proceed to the next step.
 					confirmSelection();
+					return;
 				}
 			}
 		}
 	}
 	
-	// Admin chose to add a new Main clan member
+	// Admin chose to export a new Main clan member.
 	private void selectNew()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
@@ -871,7 +795,7 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
-	// Admin chose to add a new Alt clan member
+	// Admin chose to export a new Alt clan member.
 	private void selectAlt()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
@@ -896,7 +820,7 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
-	// Get the Main for the new Alt clan member
+	// Get the new Alt member's Main in the clan.
 	private void selectMain()
 	{
 		// We would only reach this point after selectAlt has been run, 
@@ -916,7 +840,7 @@ public class SpectralClanMgmtButton
 		.build();
 	}
 	
-	// Admin chose to export a name change
+	// Admin chose to export a name change.
 	private void selectNameChange()
 	{
 		// Since there's three methods where setListeners can be called and these methods can be visited more than once,
@@ -937,7 +861,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Select the member whose name was changed from the left column.<br>Or click cancel to exit.")
+		.openTextMenuInput("Select a member from the left column for the name change export.<br>Or click cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build();
 	}
@@ -948,7 +872,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("For name change exports, the member must be on your Friends list.<br>You can remove the member from your Friends list afterwards.")
+		.openTextMenuInput("For name change exports, the member must be on your Friends list until the export is complete.")
 		.option("OK", () -> {
 			wasClicked = false;
 			chatboxPanelManager.close();
@@ -966,7 +890,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Is the member whose name was changed on your Friends list?")
+		.openTextMenuInput("Is the member you intend to select on your Friends list?")
 		.option("Yes", () -> selectNameChange())
 		.option("No", () -> abortNameChange())
 		.option("Cancel", () -> { 
@@ -978,7 +902,7 @@ public class SpectralClanMgmtButton
 	
 	// I separated out the new member export options cause the chatbox looked too crowded when there were 4 options to click.
 	// If the admin selects to export a new member, they'll see this prompt next.
-	private void memberExport()
+	private void newMemberExport()
 	{
 		chatboxPanelManager.close();
 		
@@ -1001,7 +925,7 @@ public class SpectralClanMgmtButton
 		{
 			// Putting this check here in case the player was an admin-ranked member when the button was created
 			// and their rank is changed to a non-admin one while the button exists.
-			if (SpectralClanMgmtPlugin.isAdminRank(spectralClanMgmtPlugin.getLocalPlayerRank()))
+			if (SpectralClanMgmtPlugin.isAdminRank(spectralClanMgmtPlugin.getLocalPlayerRank(Optional.empty())))
 			{
 				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
 				// a prompt in the chatbox.
@@ -1019,7 +943,7 @@ public class SpectralClanMgmtButton
 							
 							chatboxPanelManager
 							.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
-							.option("Member", () -> memberExport())
+							.option("Member", () -> newMemberExport())
 							.option("Name Change", () -> nameChangeCheckPreReq())
 							.option("Cancel", () ->
 							{
@@ -1049,7 +973,10 @@ public class SpectralClanMgmtButton
 			}
 			else
 			{
-				spectralClanMgmtPlugin.disableButton();
+				chatboxPanelManager
+				.openTextMenuInput("Rank check failed. You don't seem to have an admin rank anymore.<br>Contact the developer if you do have an admin rank still.")
+				.option("OK", () -> chatboxPanelManager.close())
+				.build();
 			}
 		});
 	}

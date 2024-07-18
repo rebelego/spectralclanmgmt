@@ -7,6 +7,8 @@ import net.runelite.api.*;
 import net.runelite.api.clan.*;
 import net.runelite.api.events.*;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -72,25 +74,21 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private SpectralClanMgmtCommandPhrases spectralPhrases;
 	
-	private boolean canUseDiscordCommands = false;
-	
-	// The permission flag that determines if clan members can use the !spectral command. The value comes from our online web app
-	// so we can change it at any time without having to modify the plugin.
-	// This value is checked and set the first time the player logs in after start-up,
-	// as well as when they use the command but before anything has been output to the clan chat.
-	private boolean canUseSpectralCommand = false;
+	// These two booleans are the permission flags that determine if spectral's commands can be used.
+	// The values comes from our online web app so we can revoke permissions at any time without having to modify the plugin.
+	// Permission checks are done after startup, as well as when a command is used and 
+	// it's been at least 5 minutes since permissions were last checked.
+	private boolean canUseDiscordCommands;
+	private boolean canUseSpectralCommand;
 	
 	private boolean pluginLoaded = false;
 	
-	private boolean configChecked = false;
-	
-	// Used to track if the user is currently viewing the Members List UI (which means the button exists if they're one of the admins).
 	private boolean memberWidgetLoaded = false;
 	
-	// This is just for checking if the next tick has occurred after logging in.
-	private boolean firstGameTick = false;
+	private boolean firstGameTick;
 	
-	private int previousPhrasePosition = -1;
+	// Used to ensure you won't see the same phrase multiple times in a row when you use the spectral.
+	private int previousPhrasePosition;
 	
 	private static final String MOD_COMMAND = "!mod";
 	
@@ -98,11 +96,21 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private static final String SPECTRAL_COMMAND = "!spectral";
 	
-	private int localPlayerRank = 0;
+	// Controls how many times an http request will be resent if 
+	// a previous request failed to receive a response.
+	// Up to 5 attempts can be made after a failed request.
+	private int attemptCount;
 	
-	private int attemptCount = 0;
+	private int gameTickCount;
 	
-	private int gameTickCount = 0;
+	// They'll need to wait 30 seconds after they use one of spectral's command before they can use one again.
+	private int coolDown;
+	
+	private boolean coolDownFinished;
+	
+	// For the command use, we'll limit the permission checks to once every 5 minutes they're logged in.
+	// Doing the permission check every time was just had too slow of a response time.
+	private int permissionCheckTimer;
 	
 	@Provides
 	SpectralClanMgmtConfig getConfig(ConfigManager configManager)
@@ -113,27 +121,35 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
+		log.info("Spectral Clan Mgmt Plugin started!");
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
 		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
-		clanChatCommandManager.registerCommandAsync(MOD_COMMAND, this::getMod);
-		clanChatCommandManager.registerCommandAsync(RECRUIT_COMMAND, this::getRecruit);
-		clanChatCommandManager.registerCommandAsync(SPECTRAL_COMMAND, this::getSpectral);
-		log.info("Spectral Clan Mgmt Plugin started!");
+		clanChatCommandManager.registerSpectralCommandAsync(MOD_COMMAND, this::getMod);
+		clanChatCommandManager.registerSpectralCommandAsync(RECRUIT_COMMAND, this::getRecruit);
+		clanChatCommandManager.registerSpectralCommandAsync(SPECTRAL_COMMAND, this::getSpectral);
+		attemptCount = 0;
+		coolDown = -1;
+		coolDownFinished = true;
+		permissionCheckTimer = -1;
+		gameTickCount = 0;
+		previousPhrasePosition = -1;
+		firstGameTick = false;
+		canUseSpectralCommand = false;
+		canUseDiscordCommands = false;
 	}
 	
 	@Override
 	protected void shutDown() throws Exception
 	{
+		clanChatCommandManager.unregisterSpectralCommand(MOD_COMMAND);
+		clanChatCommandManager.unregisterSpectralCommand(RECRUIT_COMMAND);
+		clanChatCommandManager.unregisterSpectralCommand(SPECTRAL_COMMAND);
 		chatboxPanelManager.shutdown();
-		clanChatCommandManager.shutdown();
 		cmdMgr.shutdown();
-		clanChatCommandManager.unregisterCommand(MOD_COMMAND);
-		clanChatCommandManager.unregisterCommand(RECRUIT_COMMAND);
-		clanChatCommandManager.unregisterCommand(SPECTRAL_COMMAND);
+		clanChatCommandManager.shutdown();
 		spectralPhrases = null;
 		httpRequest.shutdown();
 		log.info("Spectral Clan Mgmt Plugin stopped!");
-		
 	}
 	
 	@Subscribe
@@ -141,6 +157,24 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (client.getGameState() == GameState.LOGGED_IN)
 		{
+			// This is for the command cooldown. They have to wait 30 seconds after using any of spectral's commands to use another one.
+			// This should help to keep the web server from being flooded with requests.
+			if (!coolDownFinished)
+			{
+				coolDown++;
+				
+				if (coolDown == 50)
+				{
+					coolDownFinished = true;
+					coolDown = -1;
+				}
+			}
+			
+			if (permissionCheckTimer != -1)
+			{
+				permissionCheckTimer++;
+			}
+			
 			if (!firstGameTick)
 			{
 				firstGameTick = true;
@@ -158,17 +192,18 @@ public class SpectralClanMgmtPlugin extends Plugin
 			if (gameTickCount == 1)
 			{
 				gameTickCount = -1;
-				
-				loadConfigLinks();
+				checkOnStartedOrChanged();
 			}
 			else
 			{
 				return;
 			}
 		}
-		else
+		else if (client.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			return;
+			coolDownFinished = true;
+			coolDown = -1;
+			permissionCheckTimer = -1;
 		}
 	}
 	
@@ -186,7 +221,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			
 			firstGameTick = false;
-			configChecked = false;
 		}
 		else
 		{
@@ -194,357 +228,184 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 	}
 	
-	// Called the next game tick after logging in if the config was either changed or the plugin started up.
-	private void loadConfigLinks()
+	@Subscribe
+	protected void onWidgetLoaded(WidgetLoaded widget)
 	{
-		canUseSpectralCommand = false;
-		canUseDiscordCommands = false;
-		
-		if (attemptCount <= 5)
+		if (widget.getGroupId() == CLAN_SETTINGS_INTERFACE)
 		{
-			// Checks if the local Player is a member of Spectral.
-			if (!spectralChecks(Optional.empty()))
+			if (getLocalPlayerRank(Optional.empty()) == 0)
 			{
-				pluginLoaded = true;
-				configChecked = true;
-				canUseSpectralCommand = false;
-				canUseDiscordCommands = false;
+				config.setAdminScriptURL("");
+				config.setSpectralDiscordAppURL("");
 				return;
 			}
 			
-			// Checks if the URL for Spectral's web app in the settings is a valid URL.
-			if (!checkURL("normal"))
+			if (isNormalRank(getLocalPlayerRank(Optional.empty())))
 			{
-				pluginLoaded = true;
-				configChecked = true;
-				canUseSpectralCommand = false;
-				canUseDiscordCommands = false;
-				
-				if (spectralPhrases != null)
-				{
-					spectralPhrases.setPhrases(null);
-				}
-				
-				return;
+				config.setAdminScriptURL("");
 			}
+		}
+		else if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
+		{
+			clanSettings = client.getClanSettings(0);
 			
-			localPlayerRank = getLocalPlayerRank();
+			// This is being set so that whenever a request is posted, if the members list UI is still open when the response is received,
+			// the HttpRequest class will route the results to the exportDone method in the clan mgmt button's class instead of in this class.
+			memberWidgetLoaded = true;
 			
-			if (!pluginLoaded)
+			// Since this plugin is meant solely for the members of Spectral to use, 
+			// the code should exit if the local player isn't in the clan.
+			if (clanSettings.getName().equals("Spectral"))
 			{
-				pluginLoaded = true;
-				
-				if (!configChecked)
+				// Since this part of the plugin is meant solely for the admin members of Spectral to use, 
+				// we don't want the button to be created if the local player's rank isn't an admin one.
+				if (isAdminRank(getLocalPlayerRank(Optional.empty())))
 				{
-					configChecked = true;
-					checkConfigLinks(localPlayerRank, "startup");
-				}
-				else
-				{
-					if (httpRequest.isReady())
+					if (checkURL("admin"))
 					{
-						httpRequest.initializeExecutor();
+						getMembersData();
 						
-						// I need this to run the plugin has finished starting and the player's logged in, 
-						// but I don't want it to run every time the GameState is LOGGED_IN, 
-						// so if the GameState wasn't LOGGED_IN when checkCommandPermission was called in setConfigLinks,
-						// it'll be run on the next game tick after the player is logged in and httpRequest is ready.
-						checkCommandPermission("startup", 0, 0);
+						if (members != null)
+						{
+							if (members.size() > 0)
+							{
+								if (memberJoinDates != null)
+								{
+									if (memberJoinDates.size() > 0 && memberJoinDates.size() == members.size())
+									{
+										// ** This method was copied from the Wise Old Man Runelite Plugin code and modified to fit this plugin's usage. 
+										// All credit for the original code goes to dekvall.
+										clientThread.invoke(() ->
+										{
+											createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, members, memberJoinDates);
+											
+											if (spectralClanMemberButton != null)
+											{
+												spectralClanMemberButton.enableButton();
+											}
+										});
+										// **
+									}
+								}
+							}
+						}
 					}
-					else
-					{
-						pluginLoaded = false;
-						firstGameTick = false;
-						return;
-					}
-				}
-			}
-			else
-			{
-				if (!configChecked)
-				{
-					configChecked = true;
-					checkConfigLinks(localPlayerRank, "configChanged");
-				}
-			}
-		}
-		else
-		{
-			return;
-		}
-	}
-	
-	private void checkConfigLinks(int rank, String src)
-	{
-		String configLink = "";
-		
-		if (isNormalRank(rank))
-		{
-			configLink = "discord";
-		}
-		else if (isAdminRank(rank))
-		{
-			configLink = "both";
-		}
-		
-		if (httpRequest.isReady())
-		{
-			httpRequest.initializeExecutor();
-			httpRequest.postRequestAsync("config", Optional.of(configLink), Optional.of(src), Optional.empty(), Optional.empty());
-		}
-		else
-		{
-			firstGameTick = false;
-			
-			if (src.equalsIgnoreCase("startup"))
-			{
-				pluginLoaded = false;
-				configChecked = false;
-			}
-			else if (src.equalsIgnoreCase("configChanged"))
-			{
-				configChecked = false;
-			}
-		}
-	}
-	
-	protected void setConfigLinks(String returnedLinks, String[] configLinks, Optional<String> src)
-	{
-		String source = src.orElse("");
-		
-		if (configLinks.length > 0)
-		{
-			attemptCount = 0;
-			
-			// If blank was returned for some reason for a link, they'll need to contact the developer about it.
-			// Once whatever issue that was causing blank to be returned for a link is fixed, they can flip the plugin off and on again
-			// to force it to pull the link's value from the web app again.
-			if (returnedLinks.equalsIgnoreCase("both"))
-			{
-				config.setSpectralDiscordAppURL(configLinks[0]);
-				config.setAdminScriptURL(configLinks[1]);
-			}
-			else if (returnedLinks.equalsIgnoreCase("discord"))
-			{
-				config.setSpectralDiscordAppURL(configLinks[0]);
-			}
-			
-			if (!checkURL("discord"))
-			{
-				canUseDiscordCommands = false;
-			}
-			else
-			{
-				canUseDiscordCommands = true;
-			}
-			
-			canUseSpectralCommand = true;
-			configChecked = true;
-			
-			if (source.equalsIgnoreCase("startup"))
-			{
-				if (client.getGameState() == GameState.LOGGED_IN)
-				{
-					// I need this to run the plugin has finished starting and the player's logged in, 
-					// but I don't want it to run every time the GameState is LOGGED_IN, 
-					// so it will only be called when checkConfigLinks is called at startup.
-					checkCommandPermission("startup", 0, 0);
 				}
 				else
 				{
-					pluginLoaded = false;
-					firstGameTick = false;
-					httpRequest.shutdown();
+					config.setAdminScriptURL("");
 				}
 			}
-			else if (source.equalsIgnoreCase("configChanged"))
-			{
-				httpRequest.shutdown();
-			}
-		}
-		else
-		{
-			attemptCount++;
-			
-			// If something happened and no links were returned from the post request to the web app,
-			// clear the hidden config items and set pluginLoaded to false so it can try again.
-			// Up to 5 attempts are allowed before it will have to be blocked and the member will need to contact the developer about it.
-			config.setSpectralDiscordAppURL("");
-			config.setAdminScriptURL("");
-			canUseDiscordCommands = false;
-			canUseSpectralCommand = false;
-			
-			if (attemptCount <= 5)
-			{
-				firstGameTick = false;
-				
-				if (source.equalsIgnoreCase("startup"))
-				{
-					pluginLoaded = false;
-				}
-				else if (source.equalsIgnoreCase("configChanged"))
-				{
-					configChecked = false;
-				}
-			}
-			else
-			{
-				pluginLoaded = true;
-				configChecked = true;
-			}
-			
-			// If they run out of attempts, they need to contact the dev so the dev can check the web app and fix it if there's an issue.
-			// If whatever was causing nothing to be returned is fixed, then can flip the plugin off and on again to reset the attempt count.
-			httpRequest.shutdown();
 		}
 	}
 	
-	// The clan's admin ranks. The numbers are the key values in the ranks enum for the 
-	// Owner, Deputy Owner, Moderator, and Completionist (Recruiter) ranks.
-	protected static ArrayList<Integer> getAdminRanks()
+	@Subscribe
+	protected void onWidgetClosed(WidgetClosed widget)
 	{
-		return new ArrayList<>(Arrays.asList(-4, -3, 264, 252));
-	}
-	
-	// The clan's non-admin ranks. The numbers are the key values in the ranks enum for the 
-	// Gnome Child, Lieutenant, Astral, Sapphire, Emerald, Ruby, Diamond, Dragonstone, Onyx, and Zenyte ranks.
-	protected static ArrayList<Integer> getNormalRanks()
-	{
-		return new ArrayList<>(Arrays.asList(9, 35, 58, 65, 66, 67, 68, 69, 70, 71, 143, 111));
-	}
-	
-	private void checkCommandPermission(String src, int cType, int cTarget)
-	{
-		if (!checkURL("normal"))
+		// If the Members List widget is closed, reset everything (just in case).
+		if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
 		{
-			canUseSpectralCommand = false;
-			canUseDiscordCommands = false;
-			
-			if (spectralPhrases != null)
+			if (clanMembers != null)
 			{
-				spectralPhrases.setPhrases(null);
+				clanMembers.clear();
 			}
 			
-			if (src.equalsIgnoreCase("startup"))
+			if (getLocalPlayerRank(Optional.empty()) == 0)
 			{
-				httpRequest.shutdown();
+				config.setAdminScriptURL("");
+				config.setSpectralDiscordAppURL("");
 			}
 			
-			return;
+			members.clear();
+			memberJoinDates.clear();
+			
+			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received,
+			// the HttpRequest class will route the results to the exportDone method in this class instead of the clan mgmt button's class.
+			memberWidgetLoaded = false;
+		}
+	}
+	
+	@Subscribe
+	public void onChatMessage(ChatMessage chatMessage)
+	{
+		// In case these commands are ever seen outside of the clan chat, don't replace the command text in the chat.
+		switch (chatMessage.getType())
+		{
+			case CLAN_CHAT:
+				break;
+			default:
+				return;
 		}
 		
-		String localPlayer = Text.sanitize(client.getLocalPlayer().getName());
+		MessageNode message = chatMessage.getMessageNode();
 		
-		if (!src.equalsIgnoreCase("startup"))
+		if (message.getValue().trim().equalsIgnoreCase("!recruit") || message.getValue().trim().equalsIgnoreCase("!mod") || message.getValue().trim().equalsIgnoreCase("!spectral"))
 		{
-			httpRequest.initializeExecutor();
-		}
-		
-		httpRequest.postRequestAsync("permission", Optional.of(localPlayer), Optional.of(src), Optional.of(cType), Optional.of(cTarget));
-	}
-	
-	private void discordCommands(String commandUsed, String localPlayer, int cType, int cTarget)
-	{
-		httpRequest.initializeExecutor();
-		httpRequest.postRequestAsync(commandUsed, localPlayer, cType, cTarget);
-	}
-	
-	protected void getCommandPermission(boolean result, String src, int cType, int cTarget)
-	{
-		canUseSpectralCommand = result;
-		String source = src;
-		int chatType = cType;
-		int chatTarget = cTarget;
-		
-		if (result)
-		{
-			if (spectralPhrases == null)
-			{
-				spectralPhrases = new SpectralClanMgmtCommandPhrases();
-			}
+			String localPlayer = client.getLocalPlayer().getName();
+			String sender = Text.removeTags(message.getName());
 			
-			if (spectralPhrases.getPhrases() == null)
+			// If the local player isn't in Spectral, return (we don't want to replace the text).
+			if (getLocalPlayerRank(Optional.of(localPlayer)) == 0)
 			{
-				checkPhrases(source, chatType, chatTarget);
 				return;
 			}
-		}
-		else
-		{
-			if (spectralPhrases != null)
+			
+			// If the sender isn't in Spectral, return (we don't want to replace the text).
+			if (getLocalPlayerRank(Optional.of(sender)) == 0)
 			{
-				spectralPhrases.setPhrases(null);
+				return;
 			}
+			
+			updateChat(message);
 		}
+	}
+	
+	protected void updateChat(MessageNode message)
+	{
+		String result = "";
 		
-		if (source.equalsIgnoreCase("command"))
+		if (message.getValue().trim().equalsIgnoreCase("!recruit"))
 		{
-			finishSpectralCommand(result, chatType, chatTarget);
+			result = "I pinged the recruiters in Discord for help!";
 		}
-		else
+		else if (message.getValue().trim().equalsIgnoreCase("!mod"))
 		{
-			httpRequest.shutdown();
+			result = "I pinged the mods in Discord for help!";
 		}
-	}
-	
-	private void checkPhrases(String src, int cType, int cTarget)
-	{
-		if (checkURL("normal"))
+		else if (message.getValue().trim().equalsIgnoreCase("!spectral"))
 		{
-			httpRequest.postRequestAsync("phrases", Optional.empty(), Optional.of(src), Optional.of(cType), Optional.of(cTarget));
-		}
-		else
-		{
-			httpRequest.shutdown();
-		}
-	}
-	
-	protected void getPhrases(String status, String data, String src, int cType, int cTarget)
-	{
-		if (status.equalsIgnoreCase("success"))
-		{
-			if (data.length() > 0)
+			if (spectralPhrases != null && spectralPhrases.getPhrases() != null && spectralPhrases.getPhrases().length > 0)
 			{
-				String[] phrases = data.split("\\;");
+				// Get a randomly picked phrase from the phrases array. The phrase will replace the command text in the clan chat for the local player.
+				Random ran = new Random();
+				int rn = ran.nextInt(spectralPhrases.getPhrases().length);
 				
-				if (spectralPhrases != null)
+				if (previousPhrasePosition != -1)
 				{
-					spectralPhrases.setPhrases(phrases);
+					while (rn == previousPhrasePosition)
+					{
+						rn = ran.nextInt(spectralPhrases.getPhrases().length);
+					}
 				}
-				else
-				{
-					spectralPhrases = new SpectralClanMgmtCommandPhrases();
-					spectralPhrases.setPhrases(phrases);
-				}
+				
+				previousPhrasePosition = rn;
+				result = spectralPhrases.getPhrases()[rn];
 			}
 			else
 			{
-				if (spectralPhrases != null)
-				{
-					spectralPhrases.setPhrases(null);
-				}
-			}
-		}
-		else
-		{
-			if (spectralPhrases != null)
-			{
-				spectralPhrases.setPhrases(null);
+				result = "Uh oh, no phrases found! ;^;";
 			}
 		}
 		
-		String source = src;
-		int chatType = cType;
-		int chatTarget = cTarget;
+		final String cInput = result;
 		
-		if (source.equalsIgnoreCase("command"))
-		{
-			finishSpectralCommand(canUseSpectralCommand, chatType, chatTarget);
-		}
-		else
-		{
-			httpRequest.shutdown();
-		}
+		String response = new ChatMessageBuilder()
+		.append(ChatColorType.NORMAL)
+		.append(cInput)
+		.build();
+		
+		message.setRuneLiteFormatMessage(response);
+		client.refreshChat();
 	}
 	
 	// Checks if the string passed to the method is a valid URL. If it's missing, or it's not a valid URL, it'll return false
@@ -556,18 +417,18 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (URL.equalsIgnoreCase("normal"))
 		{
-			scriptURL = config.scriptURL();
+			scriptURL = config.scriptURL().trim();
 		}
 		else if (URL.equalsIgnoreCase("admin"))
 		{
-			scriptURL = config.adminScriptURL();
+			scriptURL = config.adminScriptURL().trim();
 		}
 		else if (URL.equalsIgnoreCase("discord"))
 		{
-			scriptURL = config.spectralDiscordAppURL();
+			scriptURL = config.spectralDiscordAppURL().trim();
 		}
 		
-		if (scriptURL != "")
+		if (!scriptURL.equals(""))
 		{
 			// For Spectral's purposes, there's no reason for the protocol to be anything other than http or https.
 			Pattern urlRegexPattern = Pattern.compile("^((http|https)://)?([a-zA-Z0-9]+[.])?[a-zA-Z0-9-]+(.[a-zA-Z]{2,6})?(:[0-9]{1,5})?(/[a-zA-Z0-9-._?,'+&%$#=~]*)*$");
@@ -575,6 +436,167 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		
 		return isValid;
+	}
+	
+	// Called the next game tick after logging in if the config was either changed or the plugin just started up.
+	private void checkOnStartedOrChanged()
+	{
+		if (attemptCount <= 5)
+		{
+			// Checks if the local Player is a member of Spectral.
+			if (!isRankedSpectralMember(Optional.empty()) || !checkURL("normal"))
+			{
+				pluginLoaded = true;
+				canUseSpectralCommand = false;
+				canUseDiscordCommands = false;
+				
+				if (spectralPhrases != null)
+				{
+					spectralPhrases.setPhrases(null);
+				}
+				
+				return;
+			}
+			
+			if (!pluginLoaded)
+			{
+				pluginLoaded = true;
+				String player = client.getLocalPlayer().getName();
+				getPluginData(player, Optional.empty());
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+	
+	private void getPluginData(String playerName, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
+	{
+		if (attemptCount <= 5)
+		{
+			canUseSpectralCommand = false;
+			canUseDiscordCommands = false;
+			
+			if (!checkURL("normal"))
+			{
+				config.setSpectralDiscordAppURL("");
+				config.setAdminScriptURL("");
+				
+				if (spectralPhrases != null)
+				{
+					spectralPhrases.setPhrases(null);
+				}
+				
+				return;
+			}
+			
+			String configLink = "";
+			int rank = getLocalPlayerRank(Optional.of(playerName));
+			
+			if (isNormalRank(rank))
+			{
+				configLink = "discord";
+			}
+			else if (isAdminRank(rank))
+			{
+				configLink = "both";
+			}
+			
+			if (httpRequest.isReady())
+			{
+				SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
+				
+				httpRequest.initializeExecutor();
+				
+				String player = Text.sanitize(playerName);
+				
+				if (chatboxCommandInput == null)
+				{
+					httpRequest.getRequestAsyncPluginData(configLink, player, Optional.empty());
+				}
+				else
+				{
+					httpRequest.getRequestAsyncPluginData(configLink, player, Optional.of(chatboxCommandInput));
+				}
+			}
+			else
+			{
+				firstGameTick = false;
+				pluginLoaded = false;
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+	
+	protected void setPluginData(String status, boolean permission, String[] links, String phraseList, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
+	{
+		if (status.equalsIgnoreCase("failure"))
+		{
+			attemptCount++;
+		}
+		else
+		{
+			attemptCount = 0;
+			permissionCheckTimer = 0;
+		}
+		
+		canUseSpectralCommand = permission;
+		
+		if (links.length > 0)
+		{
+			if (links.length == 2)
+			{
+				String discordURL = links[0].substring(1, links[0].length() - 1);
+				String adminURL = links[1].substring(1, links[1].length() - 1);
+				config.setSpectralDiscordAppURL(discordURL);
+				config.setAdminScriptURL(adminURL);
+			}
+			else if (links.length == 1)
+			{
+				String discordURL = links[0].substring(1, links[0].length() - 1);
+				config.setSpectralDiscordAppURL(discordURL);
+				config.setAdminScriptURL("");
+			}
+			
+			canUseDiscordCommands = true;
+		}
+		
+		if (phraseList.trim() != "")
+		{
+			String[] phrases = phraseList.split("\\;");
+			
+			if (spectralPhrases != null)
+			{
+				spectralPhrases.setPhrases(phrases);
+			}
+			else
+			{
+				spectralPhrases = new SpectralClanMgmtCommandPhrases();
+				spectralPhrases.setPhrases(phrases);
+			}
+		}
+		else
+		{
+			if (spectralPhrases != null)
+			{
+				spectralPhrases.setPhrases(null);
+			}
+		}
+		
+		SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
+		
+		if (chatboxCommandInput != null)
+		{
+			setSpectral(canUseSpectralCommand, chatboxCommandInput);
+		}
+		else
+		{
+			httpRequest.shutdown();
+		}
 	}
 	
 	// Clears and populates the members and membersJoinDates hashmaps with sorted values.
@@ -694,6 +716,40 @@ public class SpectralClanMgmtPlugin extends Plugin
 		httpRequest.shutdown();
 	}
 	
+	// The clan's admin ranks. The numbers are the key values in the ranks enum for the 
+	// Owner, Deputy Owner, Moderator, and Completionist (Recruiter) ranks.
+	protected static ArrayList<Integer> getAdminRanks()
+	{
+		return new ArrayList<>(Arrays.asList(-4, -3, 264, 252));
+	}
+	
+	// The clan's non-admin ranks. The numbers are the key values in the ranks enum for the 
+	// Gnome Child, Lieutenant, Astral, Sapphire, Emerald, Ruby, Diamond, Dragonstone, Onyx, and Zenyte ranks.
+	protected static ArrayList<Integer> getNormalRanks()
+	{
+		return new ArrayList<>(Arrays.asList(9, 35, 58, 65, 66, 67, 68, 69, 70, 71, 143, 111));
+	}
+	
+	protected int getLocalPlayerRank(Optional<String> playerName)
+	{
+		int rank = 0;
+		
+		if (client.getClanSettings(0) != null)
+		{
+			if (client.getClanSettings(0).getName().equals("Spectral"))
+			{
+				String player = playerName.orElse(client.getLocalPlayer().getName());
+				
+				if (client.getClanSettings(0).findMember(player) != null)
+				{
+					rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(player).getRank()).getId();
+				}
+			}
+		}
+		
+		return rank;
+	}
+	
 	protected static boolean isAdminRank(int rank)
 	{
 		if (getAdminRanks().contains(rank))
@@ -718,152 +774,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 	}
 	
-	// I may end up needing to use this in more places later, so it gets its own method for now.
-	protected int getLocalPlayerRank()
-	{
-		int rank = 0;
-		
-		if (client.getClanSettings(0) != null)
-		{
-			if (client.getClanSettings(0).getName().equals("Spectral"))
-			{
-				if (client.getClanSettings(0).findMember(client.getLocalPlayer().getName()) != null)
-				{
-					rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(client.getLocalPlayer().getName()).getRank()).getId();
-				}
-			}
-		}
-		
-		return rank;
-	}
-	
-	@Subscribe
-	protected void onWidgetLoaded(WidgetLoaded widget)
-	{
-		if (widget.getGroupId() == CLAN_SETTINGS_INTERFACE)
-		{
-			if (getLocalPlayerRank() == 0)
-			{
-				config.setAdminScriptURL("");
-				config.setSpectralDiscordAppURL("");
-				return;
-			}
-			
-			localPlayerRank = getLocalPlayerRank();
-			
-			if (isNormalRank(localPlayerRank))
-			{
-				config.setAdminScriptURL("");
-			}
-		}
-		else if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
-		{
-			clanSettings = client.getClanSettings(0);
-			
-			// This is being set so that whenever a request is posted, if the members list UI is still open when the response is received,
-			// the HttpRequest class will route the results to the exportDone method in the clan mgmt button's class instead of in this class.
-			memberWidgetLoaded = true;
-			
-			// Since this plugin is meant solely for the members of Spectral to use, 
-			// the code should exit if the local player isn't in the clan.
-			if (clanSettings.getName().equals("Spectral"))
-			{
-				// Since this part of the plugin is meant solely for the admin members of Spectral to use, 
-				// we don't want the button to be created if the local player's rank isn't an admin one.
-				if (isAdminRank(getLocalPlayerRank()))
-				{
-					if (checkURL("admin"))
-					{
-						getMembersData();
-						
-						if (members != null)
-						{
-							if (members.size() > 0)
-							{
-								if (memberJoinDates != null)
-								{
-									if (memberJoinDates.size() > 0 && memberJoinDates.size() == members.size())
-									{
-										// ** This method was copied from the Wise Old Man Runelite Plugin code and modified to fit this plugin's usage. 
-										// All credit for the original code goes to dekvall.
-										clientThread.invoke(() ->
-										{
-											createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, members, memberJoinDates);
-											
-											if (spectralClanMemberButton != null)
-											{
-												spectralClanMemberButton.enableButton();
-											}
-										});
-										// **
-									}
-								}
-							}
-						}
-					}
-				}
-				else
-				{
-					config.setAdminScriptURL("");
-				}
-			}
-		}
-	}
-	
-	@Subscribe
-	protected void onWidgetClosed(WidgetClosed widget)
-	{
-		// If the Members List widget is closed, reset everything (just in case).
-		if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
-		{
-			if (clanMembers != null)
-			{
-				clanMembers.clear();
-			}
-			
-			if (getLocalPlayerRank() == 0)
-			{
-				config.setAdminScriptURL("");
-				config.setSpectralDiscordAppURL("");
-			}
-			
-			localPlayerRank = getLocalPlayerRank();
-			members.clear();
-			memberJoinDates.clear();
-			
-			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received,
-			// the HttpRequest class will route the results to the exportDone method in this class instead of the clan mgmt button's class.
-			memberWidgetLoaded = false;
-		}
-	}
-	
-	protected void disableButton()
-	{
-		if (spectralClanMemberButton != null)
-		{
-			spectralClanMemberButton = null;
-		}
-	}
-	
-	private boolean checkGameState()
-	{
-		if (client.getGameState().getState() == GameState.LOGGED_IN.getState())
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	
-	private boolean spectralChecks(Optional<Integer> clanrank)
+	private boolean isRankedSpectralMember(Optional<Integer> clanrank)
 	{
 		int rank = clanrank.orElse(1000);
 		
 		if (rank == 1000)
 		{
-			rank = getLocalPlayerRank();
+			rank = getLocalPlayerRank(Optional.empty());
 			
 			// The checks for being a member of Spectral clan are all pretty much encompassed in getLocalPlayerRank. 
 			// If any of them fail, it returns 0.
@@ -907,14 +824,27 @@ public class SpectralClanMgmtPlugin extends Plugin
 	}
 	
 	// This encompasses the various checks that need to be run before one of Spectral's commands is allowed to be executed.
+	// Checks if the local player is a ranked member of Spectral, if the game state is LOGGED_IN, and if the command was entered in the clan chat.
 	private boolean commandChecks(int chatType, int rank)
 	{
-		if (!spectralChecks(Optional.of(rank)) || !checkGameState() || (chatType != 3))
+		if (!isRankedSpectralMember(Optional.of(rank)) || !checkGameState() || chatType != 3)
 		{
 			return false;
 		}
 		
 		return true;
+	}
+	
+	private boolean checkGameState()
+	{
+		if (client.getGameState().getState() == GameState.LOGGED_IN.getState())
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
 	}
 	
 	/* 
@@ -929,18 +859,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 	 */
 	private void getMod(SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String message)
 	{
-		int cTarget = chatboxCommandInput.getChatTarget();
-		int cType = chatboxCommandInput.getChatType();
 		String player = Text.sanitize(client.getLocalPlayer().getName());
-		String comm = chatboxCommandInput.getSpectralCommand();
-		int cRank = chatboxCommandInput.getRank();
 		String msg = "";
 		boolean flag = false;
 		
-		chatboxCommandInput.consume();
-		
-		if (!commandChecks(cType, cRank))
+		if (!commandChecks(chatboxCommandInput.getChatType(), chatboxCommandInput.getRank()))
 		{
+			chatboxCommandInput.consume();
 			return;
 		}
 		
@@ -949,26 +874,36 @@ public class SpectralClanMgmtPlugin extends Plugin
 			msg = "Enter a valid URL for Spectral's web app in the plugin's settings first. If it's valid, contact the developer about this issue.";
 			flag = true;
 		}
-		else if (!checkURL("discord"))
+		
+		if (!checkURL("discord"))
 		{
 			msg = "The URL for Spectral's Discord Web API is either missing or not valid. Contact the developer about this issue.";
 			flag = true;
 		}
 		
-		if (!httpRequest.isReady())
+		if (!canUseDiscordCommands)
 		{
-			msg = "The !mod command isn't ready to be used yet. Wait a minute before trying again.";
+			msg = "You aren't allowed to use this plugin's commands. Contact the developer if you're a ranked member of the Spectral clan and you see this message.";
+			flag = true;
+		}
+		
+		if (!coolDownFinished)
+		{
+			int waitTime = (int)Math.round(0.6 * (50 - coolDown));
+			msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
 			flag = true;
 		}
 		
 		if (flag)
 		{
+			chatboxCommandInput.consume();
 			final String alert = msg;
+			
 			clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", alert, null));
 		}
 		else
 		{
-			discordCommands(comm, player, cType, cTarget);
+			discordCommands(chatboxCommandInput, player);
 		}
 	}
 	
@@ -985,18 +920,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 	*/
 	private void getRecruit(SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String message)
 	{
-		int cTarget = chatboxCommandInput.getChatTarget();
-		int cType = chatboxCommandInput.getChatType();
 		String player = Text.sanitize(client.getLocalPlayer().getName());
-		String comm = chatboxCommandInput.getSpectralCommand();
-		int cRank = chatboxCommandInput.getRank();
 		String msg = "";
 		boolean flag = false;
 		
-		chatboxCommandInput.consume();
-		
-		if (!commandChecks(cType, cRank))
+		if (!commandChecks(chatboxCommandInput.getChatType(), chatboxCommandInput.getRank()))
 		{
+			chatboxCommandInput.consume();
 			return;
 		}
 		
@@ -1005,27 +935,43 @@ public class SpectralClanMgmtPlugin extends Plugin
 			msg = "Enter a valid URL for Spectral's web app in the plugin's settings first. If it's valid, contact the developer about this issue.";
 			flag = true;
 		}
-		else if (!checkURL("discord"))
+		
+		if (!checkURL("discord"))
 		{
 			msg = "The URL for Spectral's Discord Web API is either missing or not valid. Contact the developer about this issue.";
 			flag = true;
 		}
 		
-		if (!httpRequest.isReady())
+		if (!coolDownFinished)
 		{
-			msg = "The !recruit command isn't ready to be used yet. Wait a minute before trying again.";
+			int waitTime = (int)Math.round(0.6 * (50 - coolDown));
+			msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
 			flag = true;
 		}
 		
 		if (flag)
 		{
+			chatboxCommandInput.consume();
 			final String alert = msg;
+			
 			clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", alert, null));
 		}
 		else
 		{
-			discordCommands(comm, player, cType, cTarget);
+			discordCommands(chatboxCommandInput, player);
 		}
+	}
+	
+	// Player refers to the local player's name.
+	// chatboxCommandInput comes from when the spectral command the player sent to the chat.
+	private void discordCommands(SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String player)
+	{
+		if (httpRequest.isReady())
+		{
+			httpRequest.initializeExecutor();
+		}
+		
+		httpRequest.postRequestAsyncRecruitMod("discord", chatboxCommandInput, player);
 	}
 	
 	/*
@@ -1037,22 +983,18 @@ public class SpectralClanMgmtPlugin extends Plugin
 	All phrases are verified to not violate OSRS's rules or Jagex's T&C and to not exceed the chatbox's input limit.
 	All of the phrases available to the command are viewable in a private channel for clan members in Spectral's Discord server.
 	This command will only work when used in the clan chat channel.
-	This command will only work when the permission flag is set to true. A permission check is done whenever the command is used to 
+	This command will only work when the permission flag is set to true. A permission check will be run 
+	when a command is used and it's been at least 5 minutes since permissions were last checked. 
 	verify that the clan, or the clan member, still has permission to use the the command.
 	*/
 	private void getSpectral(SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String message)
 	{
-		int cTarget = chatboxCommandInput.getChatTarget();
-		int cType = chatboxCommandInput.getChatType();
-		String comm = chatboxCommandInput.getSpectralCommand();
-		int cRank = chatboxCommandInput.getRank();
 		String msg = "";
 		boolean flag = false;
 		
-		chatboxCommandInput.consume();
-		
-		if (!commandChecks(cType, cRank))
+		if (!commandChecks(chatboxCommandInput.getChatType(), chatboxCommandInput.getRank()))
 		{
+			chatboxCommandInput.consume();
 			return;
 		}
 		
@@ -1062,24 +1004,50 @@ public class SpectralClanMgmtPlugin extends Plugin
 			flag = true;
 		}
 		
+		if (!coolDownFinished)
+		{
+			int waitTime = (int)Math.round(0.6 * (50 - coolDown));
+			msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
+			flag = true;
+		}
+		
 		if (flag)
 		{
+			chatboxCommandInput.consume();
 			final String alert = msg;
-			clientThread.invoke(() -> {
+			
+			clientThread.invoke(() ->
+			{
 				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", alert, null);
 			});
 		}
 		else
 		{
-			if (httpRequest.isReady())
+			if (permissionCheckTimer == -1 || permissionCheckTimer >= 500)
 			{
-				checkCommandPermission("command", cType, cTarget);
+				if (httpRequest.isReady())
+				{
+					String player = client.getLocalPlayer().getName();
+					getPluginData(player, Optional.of(chatboxCommandInput));
+				}
+				else
+				{
+					chatboxCommandInput.consume();
+					
+					clientThread.invoke(() ->
+					{
+						client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You need to wait a minute before trying to use this command again.", null);
+					});
+				}
+			}
+			else
+			{
+				setSpectral(canUseSpectralCommand, chatboxCommandInput);
 			}
 		}
 	}
 	
-	// I need to wait for the permission and phrases check to finish before proceeding, in case the permissions were changed after start up.
-	private void finishSpectralCommand(boolean permission, int cType, int cTarget)
+	private void setSpectral(boolean permission, SpectralClanMgmtChatboxCommandInput chatboxCommandInput)
 	{
 		// Don't forget to change it back so the commands can only be entered in the clan chat.
 		String msg = "";
@@ -1090,17 +1058,20 @@ public class SpectralClanMgmtPlugin extends Plugin
 			msg = "Permissions revoked. You aren't allowed to use the !spectral command right now.";
 			flag = true;
 		}
-		else if (spectralPhrases == null)
+		
+		if (spectralPhrases == null)
 		{
 			msg = "Something went wrong. No phrases found for command. Contact the plugin dev about this issue.";
 			flag = true;
 		}
-		else if (spectralPhrases != null && spectralPhrases.getPhrases() == null)
+		
+		if (spectralPhrases != null && spectralPhrases.getPhrases() == null)
 		{
 			msg = "Something went wrong. No phrases found for command. Contact the plugin dev about this issue.";
 			flag = true;
 		}
-		else if (spectralPhrases != null && spectralPhrases.getPhrases() != null && spectralPhrases.getPhrases().length == 0)
+		
+		if (spectralPhrases != null && spectralPhrases.getPhrases() != null && spectralPhrases.getPhrases().length == 0)
 		{
 			msg = "Something went wrong. No phrases found for command. Contact the plugin dev about this issue.";
 			flag = true;
@@ -1108,41 +1079,36 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (flag)
 		{
+			// Something went wrong, so we don't want to send the chatboxInput to the chat, we need to send a game message instead.
+			chatboxCommandInput.consume();
 			final String message = msg;
-			clientThread.invoke(() -> { 
-				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null); 
-				httpRequest.shutdown(); 
+			
+			clientThread.invoke(() ->
+			{
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null);
+				httpRequest.shutdown();
 			});
 		}
 		else
 		{
-			// Get a randomly picked phrase from the phrases array. The phrase will appear in the clan chat instead of the command text.
-			Random ran = new Random();
-			int rn = ran.nextInt(spectralPhrases.getPhrases().length);
+			coolDown = 0;
+			coolDownFinished = false;
 			
-			if (previousPhrasePosition != -1)
+			// The chatboxInput can now be sent. Once the ChatMessage event is fired,
+			// the command text will be replaced with a randomly selected phrase for anyone who has the plugin installed.
+			// The phrase won't be the same for everyone, since the random number is generated locally.
+			// Anyone in the clan chat without the plugin will just see the command.
+			clientThread.invoke(() ->
 			{
-				while (rn == previousPhrasePosition)
-				{
-					rn = ran.nextInt(spectralPhrases.getPhrases().length);
-				}
-			}
-			
-			previousPhrasePosition = rn;
-			
-			final String cInput = spectralPhrases.getPhrases()[rn];
-			
-			clientThread.invoke(() -> { 
-				cmdMgr.sendChatboxInput(cInput, cType, cTarget); 
-				httpRequest.shutdown(); 
+				cmdMgr.sendChatboxInput(chatboxCommandInput.getSpectralCommand(), chatboxCommandInput.getChatType(), chatboxCommandInput.getChatTarget());
+				httpRequest.shutdown();
 			});
 		}
 	}
 	
-	// I need to wait for the permission and phrases check to finish before proceeding, in case the permissions were changed after start up.
-	protected void finishDiscordCommands(String status, String data, String commandUsed, int cType, int cTarget)
+	// The response from the http requests from both the !recruit and the !mod commands will be passed to this method.
+	protected void setRecruitMod(String status, String data, SpectralClanMgmtChatboxCommandInput chatboxCommandInput)
 	{
-		// Don't forget to change it back so the commands can only be entered in the clan chat.
 		String msg = "";
 		boolean flag = false;
 		
@@ -1151,40 +1117,37 @@ public class SpectralClanMgmtPlugin extends Plugin
 			msg = "You aren't allowed to use this plugin's commands. Contact the developer if you're a ranked member of the Spectral clan and you see this message.";
 			flag = true;
 		}
-		else
+		
+		if (status.equalsIgnoreCase("failure"))
 		{
-			if (status.equalsIgnoreCase("failure"))
-			{
-				flag = true;
-				msg = data;
-			}
-			else if (status.equalsIgnoreCase("success"))
-			{
-				if (commandUsed.equalsIgnoreCase("!recruit"))
-				{
-					msg = "I pinged the recruiters in Discord for help!";
-				}
-				else if (commandUsed.equalsIgnoreCase("!mod"))
-				{
-					msg = "I pinged the mods in Discord for help!";
-				}
-			}
+			flag = true;
+			msg = data;
 		}
 		
 		if (flag)
 		{
+			// Something went wrong, so we don't want to send the chatboxInput to the chat, we need to send a game message instead.
+			chatboxCommandInput.consume();
 			final String message = msg;
-			clientThread.invoke(() -> {
+			
+			clientThread.invoke(() ->
+			{
 				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", message, null);
 				httpRequest.shutdown();
 			});
 		}
 		else
 		{
-			final String cInput = msg;
+			coolDown = 0;
+			coolDownFinished = false;
 			
-			clientThread.invoke(() -> {
-				cmdMgr.sendChatboxInput(cInput, cType, cTarget);
+			// The chatboxInput can now be sent. Once the ChatMessage event is fired,
+			// the command text will be replaced with the set phrase the command that was used
+			// for anyone who has the plugin installed.
+			// Anyone in the clan chat without the plugin will just see the command.
+			clientThread.invoke(() ->
+			{
+				cmdMgr.sendChatboxInput(chatboxCommandInput.getSpectralCommand(), chatboxCommandInput.getChatType(), chatboxCommandInput.getChatTarget());
 				httpRequest.shutdown();
 			});
 		}

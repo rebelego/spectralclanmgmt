@@ -76,9 +76,9 @@ public class SpectralClanMgmtChatCommandInputManager
 	
 	// I know this is an ugly way to handle it, but it works, so I'm fine with that.
 	// If one of spectral's commands was entered, it'll go to a handleCommandInput and be processed from there.
-	// If it's not one of spectral's commands that was entered, it'll be processed like usual. 
-	// It's ugly, but it lets spectral's commands be handled separately so the normal chat messages 
-	// or commands from other plugins won't be affected by this plugin's code.
+	// If one of spectral's commands was not entered, it'll be processed like usual. 
+	// Having a separate method for spectral's commands allows the normal chat messages 
+	// or commands from other plugins to be unaffected by this plugin.
 	private void handleInput(ScriptCallbackEvent event)
 	{
 		final String[] stringStack = client.getStringStack();
@@ -92,7 +92,7 @@ public class SpectralClanMgmtChatCommandInputManager
 		String sCommand = "";
 		
 		
-		if (typed.equalsIgnoreCase("!mod") || typed.equalsIgnoreCase("!recruit") || typed.equalsIgnoreCase("!spectral"))
+		if (typed.trim().equalsIgnoreCase("!mod") || typed.trim().equalsIgnoreCase("!recruit") || typed.trim().equalsIgnoreCase("!spectral"))
 		{
 			if (client.getClanSettings(0) != null)
 			{
@@ -102,7 +102,7 @@ public class SpectralClanMgmtChatCommandInputManager
 				
 				The variable's value will be set to "ignore" any of the following is true when the command is used:
 					The local player isn't a member of Spectral, or isn't a ranked member of Spectral (such as guest members).
-					The local player is a ranked member of Spectral but the command wasn't entered in the clan chat.
+					The local player is a ranked member of Spectral, but the command wasn't entered in the clan chat.
 				
 				Any of Spectral's commands will be consumed and nothing else will be sent to the chat if either of the above are true.
 				Anything that isn't a Spectral command, such as normal chat input or commands from other plugins,
@@ -144,9 +144,6 @@ public class SpectralClanMgmtChatCommandInputManager
 		final String typedText = stringStack[stringStackCount - 1];
 		final String spectralCommand = sCommand;
 		
-		// If it reaches this point, the input either wasn't one of spectral's commands
-		// (i.e. it was normal chat input or another plugin's command), or it was one of spectral's commands
-		// but one of the required conditions to use it wasn't met to allow it to be processed like it normally would.
 		SpectralClanMgmtChatboxCommandInput chatboxInput = new SpectralClanMgmtChatboxCommandInput(0, spectralCommand, clanTarget, typedText, chatType, () -> clientThread.invokeLater(() -> sendChatboxInput(typedText, chatType, clanTarget)));
 		eventBus.post(chatboxInput);
 		
@@ -162,11 +159,10 @@ public class SpectralClanMgmtChatCommandInputManager
 	{
 		final String[] stringStack = client.getStringStack();
 		int stringStackCount = client.getStringStackSize();
-		
 		int rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(client.getLocalPlayer().getName()).getRank()).getId();
 		
-		// I don't want it to have the sendChatboxInput method in the resume parameter if one of Spectral's commands was entered, 
-		// because I'll be doing that in the methods for each of them.
+		// There are permission checks that have to be done first before the command can finish being sent to the chat,
+		// so the chatboxInput will be sent to the chat after those checks are done.
 		SpectralClanMgmtChatboxCommandInput chatboxInput = new SpectralClanMgmtChatboxCommandInput(rank, command, cTarget, command, cType, () -> Runnables.doNothing());
 		eventBus.post(chatboxInput);
 		
@@ -177,8 +173,6 @@ public class SpectralClanMgmtChatCommandInputManager
 		}
 	}
 	
-	
-	// Had to make this protected instead of private so it could be called from the main class, but not called outside this plugin's package.
 	protected void sendChatboxInput(String input, int chatType, int clanTarget)
 	{
 		sending = true;

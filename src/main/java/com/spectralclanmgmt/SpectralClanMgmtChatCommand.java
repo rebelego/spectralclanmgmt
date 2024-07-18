@@ -36,3 +36,4 @@ class SpectralClanMgmtChatCommand
 	private boolean async;
 	private final BiConsumer<SpectralClanMgmtChatboxCommandInput, String> execute;
 }
+

@@ -77,13 +77,10 @@ public class SpectralClanMgmtChatboxPanelManager
 		this.client = client;
 		this.clientThread = clientThread;
 		this.eventBus = eventBus;
-		
 		this.keyManager = keyManager;
 		this.mouseManager = mouseManager;
-		
 		this.clanMgmtChatboxTextMenuInputProvider = clanMgmtChatboxTextMenuInputProvider;
 		this.chatboxTextInputProvider = chatboxTextInputProvider;
-		
 		eventBus.register(this);
 	}
 	
