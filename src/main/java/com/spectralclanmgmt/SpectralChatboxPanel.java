@@ -24,7 +24,6 @@
  */
 package com.spectralclanmgmt;
 
-import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import lombok.Getter;
@@ -43,43 +42,35 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.chatbox.ChatboxTextInput;
-import net.runelite.client.input.KeyListener;
-import net.runelite.client.input.KeyManager;
-import net.runelite.client.input.MouseListener;
-import net.runelite.client.input.MouseManager;
-import net.runelite.client.input.MouseWheelListener;
+import net.runelite.client.input.*;
+import javax.inject.Inject;
 
-// I made my own version of the ChatboxPanelManager class just because there were things I wanted to change in my class version of 
-// the ChatboxTextMenuInput class, and trying to use the existing ChatboxPanelManager class while using my modified ChatboxTextMenuInput class
-// was causing problems, and it was easier to just recreate the class as my own version and use that.
 @Singleton
 @Slf4j
-public class SpectralClanMgmtChatboxPanelManager
+public class SpectralChatboxPanel
 {
 	private final Client client;
 	private final ClientThread clientThread;
 	private final EventBus eventBus;
-	
 	private final KeyManager keyManager;
 	private final MouseManager mouseManager;
-	
 	private final Provider<ChatboxTextInput> chatboxTextInputProvider;
-	private final Provider<SpectralClanMgmtChatboxTextMenuInput> clanMgmtChatboxTextMenuInputProvider;
+	private final Provider<SpectralTextMenuInput> spectralTextMenuInputProvider;
 	
 	@Getter
-	private SpectralClanMgmtChatboxInput currentInput = null;
+	private SpectralClanMgmtPlugin.SpectralInput currentInput = null;
 	
 	@Inject
-	private SpectralClanMgmtChatboxPanelManager(EventBus eventBus, Client client, ClientThread clientThread,
+	protected SpectralChatboxPanel(EventBus eventBus, Client client, ClientThread clientThread,
 	KeyManager keyManager, MouseManager mouseManager,
-	Provider<SpectralClanMgmtChatboxTextMenuInput> clanMgmtChatboxTextMenuInputProvider, Provider<ChatboxTextInput> chatboxTextInputProvider)
+	Provider<SpectralTextMenuInput> spectralTextMenuInputProvider, Provider<ChatboxTextInput> chatboxTextInputProvider)
 	{
 		this.client = client;
 		this.clientThread = clientThread;
 		this.eventBus = eventBus;
 		this.keyManager = keyManager;
 		this.mouseManager = mouseManager;
-		this.clanMgmtChatboxTextMenuInputProvider = clanMgmtChatboxTextMenuInputProvider;
+		this.spectralTextMenuInputProvider = spectralTextMenuInputProvider;
 		this.chatboxTextInputProvider = chatboxTextInputProvider;
 		eventBus.register(this);
 	}
@@ -109,7 +100,7 @@ public class SpectralClanMgmtChatboxPanelManager
 		}
 	}
 	
-	private void unsafeOpenInput(SpectralClanMgmtChatboxInput input)
+	private void unsafeOpenInput(SpectralClanMgmtPlugin.SpectralInput input)
 	{
 		client.runScript(ScriptID.MESSAGE_LAYER_OPEN, 0);
 		
@@ -146,19 +137,14 @@ public class SpectralClanMgmtChatboxPanelManager
 		input.open();
 	}
 	
-	public void openInput(SpectralClanMgmtChatboxInput input)
+	public void openInput(SpectralClanMgmtPlugin.SpectralInput input)
 	{
 		clientThread.invokeLater(() -> unsafeOpenInput(input));
 	}
 	
-	public SpectralClanMgmtChatboxTextMenuInput openTextMenuInput(String title)
+	public SpectralTextMenuInput openTextMenuInput(String title)
 	{
-		return clanMgmtChatboxTextMenuInputProvider.get().title(title);
-	}
-	
-	public ChatboxTextInput openTextInput(String prompt)
-	{
-		return chatboxTextInputProvider.get().prompt(prompt);
+		return (SpectralTextMenuInput)spectralTextMenuInputProvider.get().title(title);
 	}
 	
 	@Subscribe

@@ -5,20 +5,18 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.api.*;
 import net.runelite.api.widgets.*;
 import net.runelite.client.util.Text;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
 
 public class SpectralClanMgmtButton
 {
-	private SpectralClanMgmtPlugin spectralClanMgmtPlugin;
+	private SpectralClanMgmtConfig config;
 	private final Client client;
 	private ClanSettings clanSettings;
-	private SpectralClanMgmtHttpRequest spectralClanMgmtHttpRequest;
+	private SpectralClanMgmtHttpRequest httpRequest;
 	private final ClientThread clientThread;
-	private final SpectralClanMgmtChatboxPanelManager chatboxPanelManager;
+	private final SpectralChatboxPanel chatboxPanelManager;
 	private final Widget parent;
 	private boolean wasClicked = false;
 	private boolean listenersSet = false;
@@ -38,17 +36,17 @@ public class SpectralClanMgmtButton
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
 	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
 	
-	protected SpectralClanMgmtButton(Client client, ClientThread clientThread, SpectralClanMgmtChatboxPanelManager chatboxPanelManager, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtHttpRequest httpRequest)
+	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, ClientThread clientThread, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtHttpRequest httpRequest)
 	{
+		this.chatboxPanelManager = chatboxPanelManager;
+		this.config = config;
 		this.client = client;
 		this.clientThread = clientThread;
-		this.chatboxPanelManager = chatboxPanelManager;
 		this.parent = client.getWidget(parent);
 		this.clanmembers = members;
 		this.clanmemberJoinDates = memberJoinDates;
 		this.clanSettings = clanSettings;
-		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
-		spectralClanMgmtHttpRequest = httpRequest;
+		this.httpRequest = httpRequest;
 		
 		task = "";
 		newMemberName = "";
@@ -72,7 +70,7 @@ public class SpectralClanMgmtButton
 		this.textWidget = this.createWidgetWithText();
 		// **
 		
-		spectralClanMgmtHttpRequest.setSpectralClanMgmtButton(this);
+		this.httpRequest.setSpectralClanMgmtButton(this);
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. 
@@ -309,19 +307,19 @@ public class SpectralClanMgmtButton
 	private void exportMember()
 	{
 		// Before we proceed, we'll check that the script's URL is set and valid.
-		if (spectralClanMgmtPlugin.checkURL("admin"))
+		if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
 		{
 			// An extra check, just in case...
-			if (spectralClanMgmtHttpRequest.isReady())
+			if (httpRequest.isReady())
 			{
-				spectralClanMgmtHttpRequest.initializeExecutor();
+				httpRequest.initializeExecutor();
 				
 				if (task.equals("add-new"))
 				{
 					String tempPlayerName = newMemberName;
 					newMemberName = Text.sanitize(tempPlayerName);
 					String localPlayerName = Text.sanitize(client.getLocalPlayer().getName());
-					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, newMemberDate, newMemberName, localPlayerName);
+					httpRequest.postRequestAsyncAdmin(task, newMemberDate, newMemberName, localPlayerName);
 				}
 				else if (task.equals("add-alt"))
 				{
@@ -330,7 +328,7 @@ public class SpectralClanMgmtButton
 					tempPlayerName = mainMemberName;
 					mainMemberName = Text.sanitize(tempPlayerName);
 					
-					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, newMemberDate, mainMemberName, newMemberName);
+					httpRequest.postRequestAsyncAdmin(task, newMemberDate, mainMemberName, newMemberName);
 				}
 				else if (task.equals("name-change"))
 				{
@@ -338,7 +336,7 @@ public class SpectralClanMgmtButton
 					memberCurrentName = Text.sanitize(tempPlayerName);
 					tempPlayerName = memberOldName;
 					memberOldName = Text.sanitize(tempPlayerName);
-					spectralClanMgmtHttpRequest.postRequestAsyncAdmin(task, memberCurrentName, memberOldName, memberType);
+					httpRequest.postRequestAsyncAdmin(task, memberCurrentName, memberOldName, memberType);
 				}
 			}
 		}
@@ -390,7 +388,7 @@ public class SpectralClanMgmtButton
 	private void finished()
 	{
 		chatboxPanelManager.close();
-		spectralClanMgmtHttpRequest.shutdown();
+		httpRequest.shutdown();
 	}
 	
 	// This adds the click listeners to specific widgets in the member names column.
@@ -923,15 +921,30 @@ public class SpectralClanMgmtButton
 		
 		textWidget.setOnClickListener((JavaScriptCallback) e ->
 		{
+			int rank = 0;
+			
+			if (client.getClanSettings(0) != null)
+			{
+				if (client.getClanSettings(0).getName().equals("Spectral"))
+				{
+					String player = client.getLocalPlayer().getName();
+					
+					if (client.getClanSettings(0).findMember(player) != null)
+					{
+						rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(player).getRank()).getId();
+					}
+				}
+			}
+			
 			// Putting this check here in case the player was an admin-ranked member when the button was created
 			// and their rank is changed to a non-admin one while the button exists.
-			if (SpectralClanMgmtPlugin.isAdminRank(spectralClanMgmtPlugin.getLocalPlayerRank(Optional.empty())))
+			if (SpectralClanMgmtPlugin.isAdminRank(rank))
 			{
 				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
 				// a prompt in the chatbox.
-				if (spectralClanMgmtPlugin.checkURL("admin"))
+				if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
 				{
-					if (spectralClanMgmtHttpRequest.isReady())
+					if (httpRequest.isReady())
 					{
 						// wasClicked is used as a flag that stops the button from reacting to additional clicks
 						// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
@@ -966,7 +979,7 @@ public class SpectralClanMgmtButton
 				else
 				{
 					chatboxPanelManager
-					.openTextMenuInput("Enter a valid URL for Spectral's web app in the plugin's settings first.")
+					.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
 					.option("OK", () -> chatboxPanelManager.close())
 					.build();
 				}

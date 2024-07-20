@@ -10,7 +10,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.*;
 
@@ -45,13 +44,13 @@ public class SpectralClanMgmtHttpRequest
 	
 	// For getting the permissions, config links, and phrases all at once.
 	// This will be called after start up and when a command is used and it's been at least 5 minutes since the permissions were last checked.
-	protected void getRequestAsyncPluginData(String configLink, String player, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
+	protected void getRequestAsyncPluginData(String configLink, String player, Optional<SpectralClanMgmtPlugin.SpectralCommand> command)
 	{
 		if (executorService != null)
 		{
 			executorService.execute(() ->
 			{
-				SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
+				SpectralClanMgmtPlugin.SpectralCommand spectralCommand = command.orElse(null);
 				
 				try
 				{
@@ -97,24 +96,24 @@ public class SpectralClanMgmtHttpRequest
 							links[1] = String.valueOf(conLink.get(1));
 						}
 						
-						if (chatboxCommandInput == null)
+						if (spectralCommand == null)
 						{
 							responseReceivedPluginData("success", permission, links, phraseList, Optional.empty());
 						}
 						else
 						{
-							responseReceivedPluginData("success", permission, links, phraseList, Optional.of(chatboxCommandInput));
+							responseReceivedPluginData("success", permission, links, phraseList, Optional.of(spectralCommand));
 						}
 					}
 					else
 					{
-						if (chatboxCommandInput == null)
+						if (spectralCommand == null)
 						{
 							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.empty());
 						}
 						else
 						{
-							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.of(chatboxCommandInput));
+							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.of(spectralCommand));
 						}
 					}
 				}
@@ -126,13 +125,13 @@ public class SpectralClanMgmtHttpRequest
 		}
 	}
 	
-	protected void responseReceivedPluginData(String status, boolean perm, String[] configLinks, String phrases, Optional<SpectralClanMgmtChatboxCommandInput> chatCommandInput)
+	protected void responseReceivedPluginData(String status, boolean perm, String[] configLinks, String phrases, Optional<SpectralClanMgmtPlugin.SpectralCommand> command)
 	{
-		SpectralClanMgmtChatboxCommandInput chatboxCommandInput = chatCommandInput.orElse(null);
+		SpectralClanMgmtPlugin.SpectralCommand spectralCommand = command.orElse(null);
 		
-		if (chatboxCommandInput != null)
+		if (spectralCommand != null)
 		{
-			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.of(chatboxCommandInput));
+			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.of(spectralCommand));
 		}
 		else
 		{
@@ -158,123 +157,114 @@ public class SpectralClanMgmtHttpRequest
 	{
 		if (executorService != null)
 		{
-			// On the off-chance someone stupidly changes the value for the URL to something invalid, we'll check again here before executing.
-			if (spectralClanMgmtPlugin.checkURL("admin"))
+			executorService.execute(() ->
 			{
-				executorService.execute(() ->
+				try
 				{
-					try
+					// URL of the web app for the script.
+					String url = config.adminScriptURL();
+					
+					StringBuilder postData = new StringBuilder();
+					
+					if (task.equalsIgnoreCase("add-new"))
 					{
-						// URL of the web app for the script.
-						String url = config.adminScriptURL();
-						
-						StringBuilder postData = new StringBuilder();
-						
-						if (task.equalsIgnoreCase("add-new"))
-						{
-							postData.append(URLEncoder.encode("task", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(task, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("joinDate", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("admin", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-						}
-						else if (task.equalsIgnoreCase("add-alt"))
-						{
-							postData.append(URLEncoder.encode("task", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(task, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("joinDate", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("altPlayer", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-						}
-						else if (task.equalsIgnoreCase("name-change"))
-						{
-							postData.append(URLEncoder.encode("task", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(task, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("currentName", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("oldName", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-							postData.append('&');
-							postData.append(URLEncoder.encode("memberType", "UTF-8"));
-							postData.append('=');
-							postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-						}
-						
-						URL obj = new URL(url);
-						HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-						
-						con.setRequestMethod("POST");
-						con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-						
-						con.setDoOutput(true);
-						DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-						wr.writeBytes(postData.toString());
-						wr.flush();
-						wr.close();
-						
-						int responseCode = con.getResponseCode();
-						
-						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
-						String inputLine;
-						StringBuffer response = new StringBuffer();
-						
-						while ((inputLine = incoming.readLine()) != null)
-						{
-							response.append(inputLine);
-						}
-						
-						incoming.close();
-						
-						if (responseCode == 200)
-						{
-							JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-							String status = resp.get("status").getAsString();
-							String data = resp.get("data").getAsString();
-							
-							responseReceivedAdmin(task, status, data);
-						}
-						else
-						{
-							String data = "Something went wrong. Contact the developer about this issue.";
-							responseReceivedAdmin(task, "failure", data);
-						}
+						postData.append(URLEncoder.encode("task", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(task, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("joinDate", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("admin", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
 					}
-					catch (Exception e)
+					else if (task.equalsIgnoreCase("add-alt"))
 					{
-						e.printStackTrace();
+						postData.append(URLEncoder.encode("task", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(task, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("joinDate", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("altPlayer", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
 					}
-				});
-			}
-			else
-			{
-				String data = "The URL for Spectral's web app is either missing or not valid.";
-				responseReceivedAdmin("", "failure", data);
-			}
+					else if (task.equalsIgnoreCase("name-change"))
+					{
+						postData.append(URLEncoder.encode("task", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(task, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("currentName", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("oldName", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
+						postData.append('&');
+						postData.append(URLEncoder.encode("memberType", "UTF-8"));
+						postData.append('=');
+						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
+					}
+					
+					URL obj = new URL(url);
+					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
+					
+					con.setRequestMethod("POST");
+					con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+					
+					con.setDoOutput(true);
+					DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+					wr.writeBytes(postData.toString());
+					wr.flush();
+					wr.close();
+					
+					int responseCode = con.getResponseCode();
+					
+					BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
+					String inputLine;
+					StringBuffer response = new StringBuffer();
+					
+					while ((inputLine = incoming.readLine()) != null)
+					{
+						response.append(inputLine);
+					}
+					
+					incoming.close();
+					
+					if (responseCode == 200)
+					{
+						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
+						String status = resp.get("status").getAsString();
+						String data = resp.get("data").getAsString();
+						
+						responseReceivedAdmin(task, status, data);
+					}
+					else
+					{
+						String data = "Something went wrong. Contact the developer about this issue.";
+						responseReceivedAdmin(task, "failure", data);
+					}
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
+			});
 		}
 		else
 		{
@@ -321,11 +311,11 @@ public class SpectralClanMgmtHttpRequest
 	/*
 	This is the postRequestAsync method for the Discord-related commands. The requests are sent to Spectral's Discord web api.
 	The task argument is 'discord', it's used for routing the request in the web api.
-	The chatboxCommandInput object is used to retrieve the command the local player sent to the chat. The object itself won't be included in the request.
+	The spectralCommand object is used to retrieve the command the local player sent to the chat. The object itself won't be included in the request.
 	The player argument is for the name of the local player.
 	The task and player arguments, along with the command text, are included as parameters in the post request.
 	*/
-	protected void postRequestAsyncRecruitMod(String task, SpectralClanMgmtChatboxCommandInput chatboxCommandInput, String player)
+	protected void postRequestAsyncRecruitMod(String task, SpectralClanMgmtPlugin.SpectralCommand spectralCommand, String player)
 	{
 		if (executorService != null)
 		{
@@ -335,7 +325,7 @@ public class SpectralClanMgmtHttpRequest
 				{
 					// URL of the web app for the script.
 					String url = config.spectralDiscordAppURL();
-					String command = chatboxCommandInput.getSpectralCommand().substring(1);
+					String command = spectralCommand.getSpectralCommand().substring(1);
 					String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
 					
 					URL obj = new URL(url);
@@ -369,12 +359,12 @@ public class SpectralClanMgmtHttpRequest
 						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
 						String status = resp.get("status").getAsString();
 						String data = resp.get("data").getAsString();
-						responseReceivedRecruitMod(status, data, chatboxCommandInput);
+						responseReceivedRecruitMod(status, data, spectralCommand);
 					}
 					else
 					{
 						String data = "Something went wrong. The Discord app couldn't process the request. Contact the developer about this issue.";
-						responseReceivedRecruitMod("failure", data, chatboxCommandInput);
+						responseReceivedRecruitMod("failure", data, spectralCommand);
 					}
 				}
 				catch (Exception e)
@@ -386,12 +376,12 @@ public class SpectralClanMgmtHttpRequest
 	}
 	
 	// This receives the returned value from the postRequestAsyncRecruitMod method.
-	private void responseReceivedRecruitMod(String status, String data, SpectralClanMgmtChatboxCommandInput chatboxCommandInput)
+	private void responseReceivedRecruitMod(String status, String data, SpectralClanMgmtPlugin.SpectralCommand spectralCommand)
 	{
 		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call setRecruitMod.
 		if (client.getGameState() == GameState.LOGGED_IN)
 		{
-			spectralClanMgmtPlugin.setRecruitMod(status, data, chatboxCommandInput);
+			spectralClanMgmtPlugin.setRecruitMod(status, data, spectralCommand);
 		}
 		else
 		{

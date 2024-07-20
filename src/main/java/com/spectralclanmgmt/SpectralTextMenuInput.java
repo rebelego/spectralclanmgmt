@@ -40,7 +40,7 @@ import net.runelite.api.widgets.WidgetSizeMode;
 import net.runelite.api.widgets.WidgetTextAlignment;
 import net.runelite.client.input.KeyListener;
 
-public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatboxInput implements KeyListener
+public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput implements KeyListener
 {
 	@Data
 	@AllArgsConstructor
@@ -50,7 +50,7 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 		private Runnable callback;
 	}
 	
-	private final SpectralClanMgmtChatboxPanelManager chatboxPanelManager;
+	private final SpectralChatboxPanel chatboxPanelManager;
 	
 	@Getter
 	private String title;
@@ -62,30 +62,30 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 	private Runnable onClose;
 	
 	@Inject
-	protected SpectralClanMgmtChatboxTextMenuInput(SpectralClanMgmtChatboxPanelManager chatboxPanelManager)
+	protected SpectralTextMenuInput(SpectralChatboxPanel chatboxPanelManager)
 	{
 		this.chatboxPanelManager = chatboxPanelManager;
 	}
 	
-	public SpectralClanMgmtChatboxTextMenuInput title(String title)
+	public SpectralTextMenuInput title(String title)
 	{
 		this.title = title;
 		return this;
 	}
 	
-	public SpectralClanMgmtChatboxTextMenuInput option(String text, Runnable callback)
+	public SpectralTextMenuInput option(String text, Runnable callback)
 	{
 		options.add(new Entry(text, callback));
 		return this;
 	}
 	
-	public SpectralClanMgmtChatboxTextMenuInput onClose(Runnable onClose)
+	public SpectralTextMenuInput onClose(Runnable onClose)
 	{
 		this.onClose = onClose;
 		return this;
 	}
 	
-	public SpectralClanMgmtChatboxTextMenuInput build()
+	public SpectralTextMenuInput build()
 	{
 		if (title == null)
 		{
@@ -102,7 +102,7 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 	}
 	
 	@Override
-	protected void open()
+	public void open()
 	{
 		Widget container = chatboxPanelManager.getContainerWidget();
 		Widget prompt = container.createChild(-1, WidgetType.TEXT);
@@ -180,7 +180,7 @@ public class SpectralClanMgmtChatboxTextMenuInput extends SpectralClanMgmtChatbo
 	}
 	
 	@Override
-	protected void close()
+	public void close()
 	{
 		if (onClose != null)
 		{
