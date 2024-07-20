@@ -9,5 +9,4 @@ If you aren't part of the Spectral clan, this plugin will be useless to you.
 All of its functionality is restricted to the members of Spectral.
 
 ## Credits
-This plugin uses modified code from Runelite's chat classes, 
-Runelite's Chat Commands plugin, and the WiseOldMan plugin.
+This plugin uses modified code from Runelite's chat classes and the WiseOldMan plugin.
