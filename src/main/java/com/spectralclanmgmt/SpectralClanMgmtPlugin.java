@@ -1,7 +1,12 @@
 package com.spectralclanmgmt;
 
+import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDescriptor;
 import javax.inject.Inject;
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +15,7 @@ import net.runelite.api.clan.*;
 import net.runelite.api.events.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
+import net.runelite.api.ChatMessageType;
 import net.runelite.client.chat.ChatCommandManager;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.config.ConfigManager;
@@ -17,8 +23,6 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ChatInput;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.plugins.Plugin;
-import net.runelite.client.plugins.PluginDescriptor;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -27,10 +31,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
-import net.runelite.api.ChatMessageType;
 import net.runelite.client.util.Text;
-import okhttp3.OkHttpClient;
-import okhttp3.Response;
+import okhttp3.*;
 
 @Slf4j
 @PluginDescriptor(
@@ -219,7 +221,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		log.info("Spectral Clan Mgmt Plugin started!");
 		gameState = client.getGameState();
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
-		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient, gson);
+		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient);
 		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest);
 		attemptCount = 0;
 		coolDown = -1;
