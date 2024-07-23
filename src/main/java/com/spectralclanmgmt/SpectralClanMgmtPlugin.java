@@ -75,6 +75,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Inject
 	private OkHttpClient okHttpClient;
 	
+	@Inject
+	private SpectralClanMgmtHttpRequest httpRequest;
+	
 	private SpectralClanMgmtButton spectralClanMemberButton;
 	
 	private ClanSettings clanSettings;
@@ -90,8 +93,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private static final int CLAN_SETTINGS_MEMBERS_INTERFACE = 693;
 	
 	private static final int CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER = 45416450;
-	
-	private SpectralClanMgmtHttpRequest httpRequest;
 	
 	private SpectralClanMgmtCommandPhrases spectralPhrases;
 	
