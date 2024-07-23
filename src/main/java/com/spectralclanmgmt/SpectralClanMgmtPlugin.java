@@ -29,6 +29,7 @@ import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import net.runelite.api.ChatMessageType;
 import net.runelite.client.util.Text;
+import okhttp3.OkHttpClient;
 import okhttp3.Response;
 
 @Slf4j
@@ -67,6 +68,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	@Inject
 	private Gson gson;
+	
+	@Inject
+	private OkHttpClient okHttpClient;
 	
 	private SpectralClanMgmtButton spectralClanMemberButton;
 	
@@ -215,7 +219,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		log.info("Spectral Clan Mgmt Plugin started!");
 		gameState = client.getGameState();
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
-		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
+		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient, gson);
 		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest);
 		attemptCount = 0;
 		coolDown = -1;

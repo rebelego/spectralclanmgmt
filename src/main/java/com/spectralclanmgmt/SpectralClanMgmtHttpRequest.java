@@ -1,5 +1,6 @@
 package com.spectralclanmgmt;
 
+import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import java.io.*;
@@ -10,8 +11,9 @@ import javax.inject.Inject;
 @Slf4j
 public class SpectralClanMgmtHttpRequest
 {
-	@Inject
-	private OkHttpClient httpclient;
+	private final OkHttpClient httpclient;
+	
+	private final Gson gson;
 	
 	private SpectralClanMgmtConfig config;
 	
@@ -23,11 +25,14 @@ public class SpectralClanMgmtHttpRequest
 	
 	private boolean isReady = true;
 	
-	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client)
+	@Inject
+	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client, OkHttpClient httpclient, Gson gson)
 	{
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
 		this.config = config;
 		this.client = client;
+		this.httpclient = httpclient;
+		this.gson = gson;
 		this.button = null;
 	}
 	
