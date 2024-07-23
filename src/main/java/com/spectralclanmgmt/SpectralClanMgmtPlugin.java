@@ -65,6 +65,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Inject
 	private ChatCommandManager chatCommandManager;
 	
+	@Inject
+	private Gson gson;
+	
 	private SpectralClanMgmtButton spectralClanMemberButton;
 	
 	private ClanSettings clanSettings;
@@ -903,8 +906,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			spectralPhrases.setPhrases(null);
 		}
 		
-		Gson gson = new Gson();
-		
 		if (!response.isSuccessful())
 		{
 			throw new IOException("Error occurred: " + response);
@@ -1253,8 +1254,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	// The response from the http requests from both the !recruit and the !mod commands will be passed to this method.
 	protected String setModRecruit(Response response) throws IOException
 	{
-		Gson gson = new Gson();
-		
 		if (!response.isSuccessful())
 		{
 			throw new IOException("Error occurred: " + response);

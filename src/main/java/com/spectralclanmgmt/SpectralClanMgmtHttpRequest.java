@@ -5,15 +5,22 @@ import net.runelite.api.Client;
 import java.io.*;
 import java.util.concurrent.*;
 import okhttp3.*;
+import javax.inject.Inject;
 
 @Slf4j
 public class SpectralClanMgmtHttpRequest
 {
+	@Inject
+	private OkHttpClient httpclient;
+	
 	private SpectralClanMgmtConfig config;
+	
 	private SpectralClanMgmtPlugin spectralClanMgmtPlugin;
+	
 	private SpectralClanMgmtButton button;
-	private static final OkHttpClient httpclient = new OkHttpClient();
+	
 	private Client client;
+	
 	private boolean isReady = true;
 	
 	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client)
