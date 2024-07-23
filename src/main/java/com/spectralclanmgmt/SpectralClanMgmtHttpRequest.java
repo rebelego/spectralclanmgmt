@@ -22,7 +22,6 @@ public class SpectralClanMgmtHttpRequest
 	
 	private boolean isReady = true;
 	
-	@Inject
 	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client, OkHttpClient httpclient)
 	{
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;

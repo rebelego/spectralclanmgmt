@@ -1,12 +1,9 @@
 package com.spectralclanmgmt;
 
+import com.google.gson.*;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import javax.inject.Inject;
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonArray;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +29,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import net.runelite.client.util.Text;
-import okhttp3.*;
+import okhttp3.OkHttpClient;
+import okhttp3.Response;
 
 @Slf4j
 @PluginDescriptor(
