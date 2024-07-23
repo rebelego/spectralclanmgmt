@@ -1,23 +1,29 @@
 package com.spectralclanmgmt;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.api.*;
 import net.runelite.api.widgets.*;
 import net.runelite.client.util.Text;
+import okhttp3.Response;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class SpectralClanMgmtButton
 {
+	private SpectralClanMgmtPlugin plugin;
 	private SpectralClanMgmtConfig config;
 	private final Client client;
 	private ClanSettings clanSettings;
-	private SpectralClanMgmtHttpRequest httpRequest;
-	private final ClientThread clientThread;
 	private final SpectralChatboxPanel chatboxPanelManager;
-	private final Widget parent;
+	private final SpectralClanMgmtHttpRequest httpRequest;
+	private Widget parent;
 	private boolean wasClicked = false;
 	private boolean listenersSet = false;
 	private boolean newMemberSelected = false;
@@ -35,19 +41,16 @@ public class SpectralClanMgmtButton
 	private Widget textWidget;
 	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
 	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
+	private boolean buttonCreated;
 	
-	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, ClientThread clientThread, int parent, HashMap<Integer, String> members, HashMap<String, String> memberJoinDates, ClanSettings clanSettings, SpectralClanMgmtHttpRequest httpRequest)
+	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, SpectralClanMgmtHttpRequest httpRequest)
 	{
+		this.httpRequest = httpRequest;
 		this.chatboxPanelManager = chatboxPanelManager;
 		this.config = config;
 		this.client = client;
-		this.clientThread = clientThread;
-		this.parent = client.getWidget(parent);
-		this.clanmembers = members;
-		this.clanmemberJoinDates = memberJoinDates;
-		this.clanSettings = clanSettings;
-		this.httpRequest = httpRequest;
-		
+		this.textWidget = null;
+		this.buttonCreated = false;
 		task = "";
 		newMemberName = "";
 		newMemberDate = "";
@@ -55,7 +58,15 @@ public class SpectralClanMgmtButton
 		memberCurrentName = "";
 		memberOldName = "";
 		memberType = "";
-		
+		this.httpRequest.setButton(this);
+	}
+	
+	public void createButton(int parent, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates, ClanSettings clanSettings)
+	{
+		this.clanmembers = clanmembers;
+		this.clanmemberJoinDates = clanmemberJoinDates;
+		this.clanSettings = clanSettings;
+		this.parent = client.getWidget(parent);
 		// **
 		// The following code segment was copied from the Wise Old Man Runelite Plugin and modified. 
 		// All credit for this code segment goes to dekvall.
@@ -69,8 +80,7 @@ public class SpectralClanMgmtButton
 		this.createWidgetWithSprite(SpriteID.EQUIPMENT_BUTTON_EDGE_BOTTOM, 47, 20, 106, 9);
 		this.textWidget = this.createWidgetWithText();
 		// **
-		
-		this.httpRequest.setSpectralClanMgmtButton(this);
+		this.buttonCreated = true;
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. 
@@ -117,15 +127,38 @@ public class SpectralClanMgmtButton
 	}
 	// **
 	
-	// ** This method was copied from the Wise Old Man Runelite Plugin code. 
-	// All credit for this code segment goes to dekvall.
+	protected void destroyButton()
+	{
+		this.textWidget = null;
+		this.buttonCreated = false;
+	}
+	
+	protected boolean isButtonCreated()
+	{
+		if (this.textWidget != null)
+		{
+			this.buttonCreated = true;
+		}
+		else
+		{
+			this.buttonCreated = false;
+		}
+		
+		return this.buttonCreated;
+	}
+	
+	// ** This method was copied from the Wise Old Man Runelite Plugin code and modified. 
+	// All credit for the original code goes to dekvall.
 	private void update(boolean hovered)
 	{
-		for (Widget w : cornersAndEdges)
+		if (this.textWidget != null)
 		{
-			int spriteId = w.getSpriteId();
-			w.setSpriteId(hovered ? spriteId + 8 : spriteId - 8);
-			w.revalidate();
+			for (Widget w : cornersAndEdges)
+			{
+				int spriteId = w.getSpriteId();
+				w.setSpriteId(hovered ? spriteId + 8 : spriteId - 8);
+				w.revalidate();
+			}
 		}
 	}
 	// **
@@ -148,9 +181,11 @@ public class SpectralClanMgmtButton
 		{
 			if (newMemberName != "" && newMemberDate != "")
 			{
+				String localPlayerName = client.getLocalPlayer().getName();
+				
 				chatboxPanelManager
 				.openTextMenuInput("You have selected '" + newMemberName + "'. Is this correct?<br>Click Yes to export the data, No to select again, or Cancel to exit.")
-				.option("Yes", () -> exportMember())
+				.option("Yes", () -> exportMember(task, newMemberDate, newMemberName, localPlayerName))
 				.option("No", () -> selectNew())
 				.option("Cancel", () -> removeListeners())
 				.build();
@@ -182,7 +217,7 @@ public class SpectralClanMgmtButton
 			{
 				chatboxPanelManager
 				.openTextMenuInput("You've selected '" + mainMemberName + "' as the Main. Is this correct?<br>Click Yes to export the data, No to reselect the Main, or Cancel to exit.")
-				.option("Yes", () -> exportMember())
+				.option("Yes", () -> exportMember(task, newMemberDate, mainMemberName, newMemberName))
 				.option("No", () -> selectMain())
 				.option("Cancel", () -> removeListeners())
 				.build();
@@ -198,7 +233,7 @@ public class SpectralClanMgmtButton
 			{
 				chatboxPanelManager
 				.openTextMenuInput("You have selected '" + memberCurrentName + "'. Is this correct?<br>Click Yes to export the data, No to select again, or Cancel to exit.")
-				.option("Yes", () -> exportMember())
+				.option("Yes", () -> exportMember(task, memberCurrentName, memberOldName, memberType))
 				.option("No", () -> selectNameChange())
 				.option("Cancel", () -> removeListeners())
 				.build();
@@ -304,133 +339,178 @@ public class SpectralClanMgmtButton
 	// Otherwise, they'll see a prompt to set the URL and the entire process will be aborted.
 	// The post request is made to the script's web app asynchronously on its own thread 
 	// so it doesn't hold up the main thread while we wait for a response.
-	private void exportMember()
+	protected void exportMember(String task, String firstArg, String secondArg, String thirdArg)
 	{
-		// Before we proceed, we'll check that the script's URL is set and valid.
-		if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
+		chatboxPanelManager.close();
+		
+		if (httpRequest.getIsReady())
 		{
-			// An extra check, just in case...
-			if (httpRequest.isReady())
+			String fArg = "";
+			String sArg = "";
+			String tArg = "";
+			
+			// Before we proceed, we'll check that the script's URL is set and valid.
+			if (plugin.checkURL(config.adminScriptURL()))
 			{
-				httpRequest.initializeExecutor();
-				
 				if (task.equals("add-new"))
 				{
-					String tempPlayerName = newMemberName;
-					newMemberName = Text.sanitize(tempPlayerName);
-					String localPlayerName = Text.sanitize(client.getLocalPlayer().getName());
-					httpRequest.postRequestAsyncAdmin(task, newMemberDate, newMemberName, localPlayerName);
+					// firstArg = newMemberDate
+					// secondArg = newMemberName
+					// thirdArg = localPlayerName
+					fArg = firstArg;
+					String tempPlayerName = secondArg;
+					sArg = Text.sanitize(tempPlayerName);
+					tArg = Text.sanitize(thirdArg);
 				}
 				else if (task.equals("add-alt"))
 				{
-					String tempPlayerName = newMemberName;
-					newMemberName = Text.sanitize(tempPlayerName);
-					tempPlayerName = mainMemberName;
-					mainMemberName = Text.sanitize(tempPlayerName);
-					
-					httpRequest.postRequestAsyncAdmin(task, newMemberDate, mainMemberName, newMemberName);
+					// firstArg = newMemberDate
+					// secondArg = mainMemberName
+					// thirdArg = newMemberName
+					fArg = firstArg;
+					String tempPlayerName = thirdArg;
+					tArg = Text.sanitize(tempPlayerName);
+					tempPlayerName = secondArg;
+					sArg = Text.sanitize(tempPlayerName);
 				}
 				else if (task.equals("name-change"))
 				{
-					String tempPlayerName = memberCurrentName;
-					memberCurrentName = Text.sanitize(tempPlayerName);
-					tempPlayerName = memberOldName;
-					memberOldName = Text.sanitize(tempPlayerName);
-					httpRequest.postRequestAsyncAdmin(task, memberCurrentName, memberOldName, memberType);
+					// firstArg = memberCurrentName
+					// secondArg = memberOldName
+					// thirdArg = memberType
+					String tempPlayerName = firstArg;
+					fArg = Text.sanitize(tempPlayerName);
+					tempPlayerName = secondArg;
+					sArg = Text.sanitize(tempPlayerName);
+					tArg = thirdArg;
 				}
+				
+				httpRequest.setIsReady(false);
+				
+				httpRequest.postRequestAsyncAdmin(task, fArg, sArg, tArg).whenCompleteAsync((result, ex) ->
+				{
+					httpRequest.setIsReady(true);
+					
+					chatboxPanelManager
+					.openTextMenuInput(result)
+					.option("OK", () -> 
+					{
+						removeListeners();
+					})
+					.build();
+				});
 			}
-		}
-		else
-		{
-			chatboxPanelManager
-			.openTextMenuInput("Enter a valid URL for Spectral's web app in the plugin's settings first.")
-			.option("OK", () -> removeListeners())
-			.build();
+			else
+			{
+				chatboxPanelManager
+				.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
+				.option("OK", () ->
+				{
+					httpRequest.setIsReady(true);
+					removeListeners();
+				})
+				.build();
+			}
 		}
 	}
 	
-	// This method is called from our HttpRequest class when a response is received and the members list widget is currently loaded.
+	// This method is called from our HttpRequest class when a response is received and the members list widget is not loaded.
 	// It passes the status (success/failure) and the data holding the message from the web app.
 	// Once we've received the response, we'll store the parameters in local variables and shutdown the request's thread.
 	// The listeners are removed and the variables reset before the response is displayed in the chatbox.
 	// Additional text is appended before the response is displayed depending on the task's value if the export's status is "success".
-	protected void exportDone(String tk, String stat, String dat)
+	protected String exportDone(String task, Response response) throws IOException
 	{
-		String status = stat;
-		String response = dat;
-		String t = tk;
+		Gson gson = new Gson();
 		
-		removeListeners();
-		
-		if (status.equals("success"))
+		if (!response.isSuccessful())
 		{
-			if (t.equals("add-new"))
+			throw new IOException("Error occurred: " + response);
+		}
+		
+		JsonObject resp;
+		String stat = "";
+		String res = "";
+		
+		try
+		{
+			resp = gson.fromJson(response.body().charStream(), JsonObject.class);
+		}
+		catch (JsonSyntaxException ex)
+		{
+			throw new IOException("Error occurred when attempting to deserialize the response body.", ex);
+		}
+		
+		if (resp == null)
+		{
+			return "Something went wrong. Response body was not a JSON string.";
+		}
+		
+		stat = resp.get("status").getAsString();
+		res = resp.get("data").getAsString();
+		
+		if (stat.equalsIgnoreCase("success"))
+		{
+			if (task.equalsIgnoreCase("add-new"))
 			{
-				response = response + "<br>Go into Discord now and wait for the Spectral bot to ping you!";
+				res = res + "<br>Don't forget to update the member's Discord name and role!";
 			}
-			else if (t.equalsIgnoreCase("add-alt") || t.equalsIgnoreCase("name-change"))
+			else if (task.equalsIgnoreCase("add-alt"))
 			{
-				response = response + "<br>All done!";
+				res = res + "<br>Don't forget to add the alt to the Main's Discord name!";
+			}
+			else if (task.equalsIgnoreCase("name-change"))
+			{
+				res = res + "<br>Don't forget to update the member's Discord name!";
 			}
 		}
 		
-		// Just in case there's a chatbox prompt open at the time.
-		chatboxPanelManager.close();
-		
-		chatboxPanelManager
-		.openTextMenuInput(response)
-		.option("OK", () -> finished())
-		.build();
-	}
-	
-	// I had to put these out here, otherwise the chatbox wouldn't show the result prompt
-	// when the response was received and this class' exportDone method was called.
-	private void finished()
-	{
-		chatboxPanelManager.close();
-		httpRequest.shutdown();
+		return res;
 	}
 	
 	// This adds the click listeners to specific widgets in the member names column.
 	private void setListeners()
 	{
-		newMemberSelected = false;
-		altMemberSelected = false;
-		mainMemberSelected = false;
-		changedMemberSelected = false;
-		newMemberName = "";
-		newMemberDate = "";
-		mainMemberName = "";
-		memberCurrentName = "";
-		memberOldName = "";
-		memberType = "";
-		task = "";
-		
-		// This gets the child widgets of the member names column widget.
-		Widget[] memberWidgets = client.getWidget(693, 10).getChildren();
-		
-		// This attaches a click listener to the second child widget (i = 1) of the member names column
-		// and then every 3rd child widget after that, because those are the widgets with the member's name for its text.
-		// We don't get the member's name from the widget's text though; instead we pass the value for i, stored in temp variable j,
-		// to the method of the widget's click listener. j is the child widget's position in the array of children, and that will
-		// allow us to get the value of the name displayed on the widget (without all the invisible or weird characters that fuck things up)
-		// which will then be used to get the member's int join date.
-		// We already got the members' names and their join dates earlier when the members list widget was loaded.
-		for (int i = 1; i < memberWidgets.length; i = i + 3)
+		if (buttonCreated)
 		{
-			int j = i;
-			memberWidgets[i].setHasListener(true);
-			memberWidgets[i].setOnClickListener((JavaScriptCallback) e -> getSelectedMember(j));
+			newMemberSelected = false;
+			altMemberSelected = false;
+			mainMemberSelected = false;
+			changedMemberSelected = false;
+			newMemberName = "";
+			newMemberDate = "";
+			mainMemberName = "";
+			memberCurrentName = "";
+			memberOldName = "";
+			memberType = "";
+			task = "";
+			
+			// This gets the child widgets of the member names column widget.
+			Widget[] memberWidgets = client.getWidget(693, 10).getChildren();
+			
+			// This attaches a click listener to the second child widget (i = 1) of the member names column
+			// and then every 3rd child widget after that, because those are the widgets with the member's name for its text.
+			// We don't get the member's name from the widget's text though; instead we pass the value for i, stored in temp variable j,
+			// to the method of the widget's click listener. j is the child widget's position in the array of children, and that will
+			// allow us to get the value of the name displayed on the widget (without all the invisible or weird characters that fuck things up)
+			// which will then be used to get the member's int join date.
+			// We already got the members' names and their join dates earlier when the members list widget was loaded.
+			for (int i = 1; i < memberWidgets.length; i = i + 3)
+			{
+				int j = i;
+				memberWidgets[i].setHasListener(true);
+				memberWidgets[i].setOnClickListener((JavaScriptCallback)e -> getSelectedMember(j));
+			}
+			
+			client.getWidget(693, 10).setChildren(memberWidgets);
+			
+			listenersSet = true;
 		}
-		
-		client.getWidget(693, 10).setChildren(memberWidgets);
-		
-		listenersSet = true;
 	}
 	
 	// This is essentially a reset, everything is cleared and the listeners are removed in preparation 
 	// for the button being clicked again or the members list widget being closed.
-	private void removeListeners()
+	protected void removeListeners()
 	{
 		wasClicked = false;
 		newMemberSelected = false;
@@ -445,15 +525,18 @@ public class SpectralClanMgmtButton
 		memberType = "";
 		task = "";
 		
-		Widget[] memberWidgets = client.getWidget(693, 10).getChildren();
-		
-		for (int i = 1; i < memberWidgets.length; i = i+3)
+		if (buttonCreated)
 		{
-			memberWidgets[i].setOnClickListener((Object[]) null);
-			memberWidgets[i].setHasListener(false);
+			Widget[] memberWidgets = client.getWidget(693, 10).getChildren();
+			
+			for (int i = 1; i < memberWidgets.length; i = i + 3)
+			{
+				memberWidgets[i].setOnClickListener((Object[])null);
+				memberWidgets[i].setHasListener(false);
+			}
+			
+			client.getWidget(693, 10).setChildren(memberWidgets);
 		}
-		
-		client.getWidget(693, 10).setChildren(memberWidgets);
 		
 		listenersSet = false;
 		
@@ -917,61 +1000,71 @@ public class SpectralClanMgmtButton
 	
 	protected void enableButton()
 	{
-		textWidget.setText("<col=ffffff>" + "Export Clan Member" + "</col>");
-		
-		textWidget.setOnClickListener((JavaScriptCallback) e ->
+		if (buttonCreated)
 		{
-			int rank = 0;
+			textWidget.setText("<col=ffffff>" + "Export Clan Member" + "</col>");
 			
-			if (client.getClanSettings(0) != null)
+			textWidget.setOnClickListener((JavaScriptCallback)e ->
 			{
-				if (client.getClanSettings(0).getName().equals("Spectral"))
+				int rank = 0;
+				
+				if (client.getClanSettings(0) != null)
 				{
-					String player = client.getLocalPlayer().getName();
-					
-					if (client.getClanSettings(0).findMember(player) != null)
+					if (client.getClanSettings(0).getName().equals("Spectral"))
 					{
-						rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(player).getRank()).getId();
+						String player = client.getLocalPlayer().getName();
+						
+						if (client.getClanSettings(0).findMember(player) != null)
+						{
+							rank = client.getClanSettings(0).titleForRank(client.getClanSettings(0).findMember(player).getRank()).getId();
+						}
 					}
 				}
-			}
-			
-			// Putting this check here in case the player was an admin-ranked member when the button was created
-			// and their rank is changed to a non-admin one while the button exists.
-			if (SpectralClanMgmtPlugin.isAdminRank(rank))
-			{
-				// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
-				// a prompt in the chatbox.
-				if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
+				
+				// Putting this check here in case the player was an admin-ranked member when the button was created
+				// and their rank is changed to a non-admin one while the button exists.
+				if (SpectralClanMgmtPlugin.isAdminRank(rank))
 				{
-					if (httpRequest.isReady())
+					// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
+					// a prompt in the chatbox.
+					if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
 					{
-						// wasClicked is used as a flag that stops the button from reacting to additional clicks
-						// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
-						// We don't want them clicking the button then starting the export process, only to click the button
-						// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
-						if (wasClicked == false)
+						if (httpRequest.getIsReady())
 						{
-							wasClicked = true;
-							
-							chatboxPanelManager
-							.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
-							.option("Member", () -> newMemberExport())
-							.option("Name Change", () -> nameChangeCheckPreReq())
-							.option("Cancel", () ->
+							// wasClicked is used as a flag that stops the button from reacting to additional clicks
+							// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
+							// We don't want them clicking the button then starting the export process, only to click the button
+							// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
+							if (wasClicked == false)
 							{
-								wasClicked = false;
-								chatboxPanelManager.close();
-							})
+								wasClicked = true;
+								
+								chatboxPanelManager
+								.openTextMenuInput("Are you exporting a new member or a name change?<br>Select an option below, or click cancel to exit.")
+								.option("Member", () -> newMemberExport())
+								.option("Name Change", () -> nameChangeCheckPreReq())
+								.option("Cancel", () ->
+								{
+									wasClicked = false;
+									chatboxPanelManager.close();
+								})
+								.build();
+							}
+						}
+						else
+						{
+							// If this occurs, then the response from a post request hasn't been received yet.
+							// This will automatically be closed, if it's not already, when the request's response is received.
+							chatboxPanelManager
+							.openTextMenuInput("You can't start another export right now.<br>Wait a minute before trying again.")
+							.option("OK", () -> chatboxPanelManager.close())
 							.build();
 						}
 					}
 					else
 					{
-						// If this occurs, then the response from a post request hasn't been received yet.
-						// This will automatically be closed, if it's not already, when the request's response is received.
 						chatboxPanelManager
-						.openTextMenuInput("The previous export has not finished yet.")
+						.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
 						.option("OK", () -> chatboxPanelManager.close())
 						.build();
 					}
@@ -979,18 +1072,11 @@ public class SpectralClanMgmtButton
 				else
 				{
 					chatboxPanelManager
-					.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
+					.openTextMenuInput("Rank check failed. You don't seem to have an admin rank anymore.<br>Contact the developer if you do have an admin rank still.")
 					.option("OK", () -> chatboxPanelManager.close())
 					.build();
 				}
-			}
-			else
-			{
-				chatboxPanelManager
-				.openTextMenuInput("Rank check failed. You don't seem to have an admin rank anymore.<br>Contact the developer if you do have an admin rank still.")
-				.option("OK", () -> chatboxPanelManager.close())
-				.build();
-			}
-		});
+			});
+		}
 	}
 }

@@ -1,142 +1,85 @@
 package com.spectralclanmgmt;
 
-import com.google.gson.*;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
-import net.runelite.api.GameState;
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URLEncoder;
-import java.net.URL;
-import java.util.Optional;
+import java.io.*;
 import java.util.concurrent.*;
+import okhttp3.*;
 
+@Slf4j
 public class SpectralClanMgmtHttpRequest
 {
-	protected ExecutorService executorService;
-	private SpectralClanMgmtButton spectralClanMgmtButton;
 	private SpectralClanMgmtConfig config;
 	private SpectralClanMgmtPlugin spectralClanMgmtPlugin;
+	private SpectralClanMgmtButton button;
+	private static final OkHttpClient httpclient = new OkHttpClient();
 	private Client client;
+	private boolean isReady = true;
 	
 	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client)
 	{
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
 		this.config = config;
 		this.client = client;
-		this.executorService = null;
+		this.button = null;
 	}
 	
-	protected void setSpectralClanMgmtButton(SpectralClanMgmtButton spectralClanMgmtButton)
+	protected void setButton(SpectralClanMgmtButton button)
 	{
-		this.spectralClanMgmtButton = spectralClanMgmtButton;
-	}
-	
-	protected void initializeExecutor()
-	{
-		if (executorService == null)
-		{
-			executorService = Executors.newSingleThreadExecutor();
-		}
+		this.button = button;
 	}
 	
 	// For getting the permissions, config links, and phrases all at once.
 	// This will be called after start up and when a command is used and it's been at least 5 minutes since the permissions were last checked.
-	protected void getRequestAsyncPluginData(String configLink, String player, Optional<SpectralClanMgmtPlugin.SpectralCommand> command)
+	protected String getRequestAsyncPluginData(String configLink, String player)
 	{
-		if (executorService != null)
+		if (!configLink.equalsIgnoreCase("discord") && !configLink.equalsIgnoreCase("both"))
 		{
-			executorService.execute(() ->
-			{
-				SpectralClanMgmtPlugin.SpectralCommand spectralCommand = command.orElse(null);
-				
-				try
-				{
-					// URL of the web app with parameters for GET request.
-					String url = String.format("%s?configLink=%s&player=%s",
-					config.scriptURL(),
-					URLEncoder.encode(configLink, "UTF-8"),
-					URLEncoder.encode(player, "UTF-8"));
-					
-					URL obj = new URL(url);
-					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-					
-					con.setRequestMethod("GET");
-					
-					int responseCode = con.getResponseCode();
-					
-					if (responseCode == 200)
-					{
-						BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
-						String inputLine;
-						StringBuffer response = new StringBuffer();
-						
-						while ((inputLine = incoming.readLine()) != null)
-						{
-							response.append(inputLine);
-						}
-						
-						incoming.close();
-						
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						boolean permission = resp.get("permission").getAsBoolean();
-						String phraseList = resp.get("phrases").getAsString();
-						JsonArray conLink = resp.get("configLink").getAsJsonArray();
-						String[] links = new String[conLink.size()];
-						
-						if (configLink.equalsIgnoreCase("discord"))
-						{
-							links[0] = String.valueOf(conLink.get(0));
-						}
-						else if (configLink.equalsIgnoreCase("both"))
-						{
-							links[0] = String.valueOf(conLink.get(0));
-							links[1] = String.valueOf(conLink.get(1));
-						}
-						
-						if (spectralCommand == null)
-						{
-							responseReceivedPluginData("success", permission, links, phraseList, Optional.empty());
-						}
-						else
-						{
-							responseReceivedPluginData("success", permission, links, phraseList, Optional.of(spectralCommand));
-						}
-					}
-					else
-					{
-						if (spectralCommand == null)
-						{
-							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.empty());
-						}
-						else
-						{
-							responseReceivedPluginData("failure", false, new String[]{}, "", Optional.of(spectralCommand));
-						}
-					}
-				}
-				catch (Exception e)
-				{
-					e.printStackTrace();
-				}
-			});
+			return configLink;
 		}
-	}
-	
-	protected void responseReceivedPluginData(String status, boolean perm, String[] configLinks, String phrases, Optional<SpectralClanMgmtPlugin.SpectralCommand> command)
-	{
-		SpectralClanMgmtPlugin.SpectralCommand spectralCommand = command.orElse(null);
 		
-		if (spectralCommand != null)
+		CompletableFuture<String> respBody = new CompletableFuture<>();
+		
+		HttpUrl url = HttpUrl.parse(config.scriptURL()).newBuilder()
+		.addQueryParameter("configLink", configLink)
+		.addQueryParameter("player", player)
+		.build();
+		
+		Request request = new Request.Builder()
+									 .url(url.toString())
+									 .get()
+									 .build();
+		
+		httpclient.newCall(request).enqueue(new Callback()
 		{
-			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.of(spectralCommand));
-		}
-		else
-		{
-			spectralClanMgmtPlugin.setPluginData(status, perm, configLinks, phrases, Optional.empty());
-		}
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				respBody.completeExceptionally(e);
+			}
+			
+			@Override
+			public void onResponse(Call call, Response response) throws IOException
+			{
+				if (!response.isSuccessful())
+				{
+					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+				}
+				else
+				{
+					try
+					{
+						respBody.complete(spectralClanMgmtPlugin.setPluginData(response));
+					}
+					finally
+					{
+						response.close();
+					}
+				}
+			}
+		});
+		
+		return respBody.join();
 	}
 	
 	/* 
@@ -153,159 +96,77 @@ public class SpectralClanMgmtHttpRequest
 	 * secondArg will either be the name of the new Main OR the name of the new Alt's Main OR the previous name of a member name change.
 	 * thirdArg will either be the name of the local player OR the name of the new Alt member OR member type ('main', 'alt', or 'both') from name change export.
 	 */
-	protected void postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg)
+	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg)
 	{
-		if (executorService != null)
+		CompletableFuture<String> respBody = new CompletableFuture<>();
+		
+		String arg1 = "task";
+		String arg2 = "";
+		String arg3 = "";
+		String arg4 = "";
+		
+		if (task.equalsIgnoreCase("add-new"))
 		{
-			executorService.execute(() ->
-			{
-				try
-				{
-					// URL of the web app for the script.
-					String url = config.adminScriptURL();
-					
-					StringBuilder postData = new StringBuilder();
-					
-					if (task.equalsIgnoreCase("add-new"))
-					{
-						postData.append(URLEncoder.encode("task", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(task, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("joinDate", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("admin", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-					}
-					else if (task.equalsIgnoreCase("add-alt"))
-					{
-						postData.append(URLEncoder.encode("task", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(task, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("joinDate", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("mainPlayer", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("altPlayer", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-					}
-					else if (task.equalsIgnoreCase("name-change"))
-					{
-						postData.append(URLEncoder.encode("task", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(task, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("currentName", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(firstArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("oldName", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(secondArg, "UTF-8"));
-						postData.append('&');
-						postData.append(URLEncoder.encode("memberType", "UTF-8"));
-						postData.append('=');
-						postData.append(URLEncoder.encode(thirdArg, "UTF-8"));
-					}
-					
-					URL obj = new URL(url);
-					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-					
-					con.setRequestMethod("POST");
-					con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-					
-					con.setDoOutput(true);
-					DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-					wr.writeBytes(postData.toString());
-					wr.flush();
-					wr.close();
-					
-					int responseCode = con.getResponseCode();
-					
-					BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
-					String inputLine;
-					StringBuffer response = new StringBuffer();
-					
-					while ((inputLine = incoming.readLine()) != null)
-					{
-						response.append(inputLine);
-					}
-					
-					incoming.close();
-					
-					if (responseCode == 200)
-					{
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						String status = resp.get("status").getAsString();
-						String data = resp.get("data").getAsString();
-						
-						responseReceivedAdmin(task, status, data);
-					}
-					else
-					{
-						String data = "Something went wrong. Contact the developer about this issue.";
-						responseReceivedAdmin(task, "failure", data);
-					}
-				}
-				catch (Exception e)
-				{
-					e.printStackTrace();
-				}
-			});
+			arg2 = "joinDate";
+			arg3 = "mainPlayer";
+			arg4 = "adminPlayer";
 		}
-		else
+		else if (task.equalsIgnoreCase("add-alt"))
 		{
-			String data = "The executor wasn't initialized. Contact the developer about this issue.";
-			responseReceivedAdmin("", "failure", data);
+			arg2 = "joinDate";
+			arg3 = "mainPlayer";
+			arg4 = "altPlayer";
 		}
-	}
-	
-	private void responseReceivedAdmin(String task, String status, String data)
-	{
-		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call exportDone.
-		if (client.getGameState() == GameState.LOGGED_IN)
+		else if (task.equalsIgnoreCase("name-change"))
 		{
-			// Make sure that the members list widget is still loaded when a response is returned
-			// before calling the exportDone method in the button's class.
-			if (spectralClanMgmtPlugin.isMemberWidgetLoaded())
+			arg2 = "currentName";
+			arg3 = "oldName";
+			arg4 = "memberType";
+		}
+		
+		// URL of the web app for the script.
+		HttpUrl adminURL = HttpUrl.parse(config.adminScriptURL());
+		
+		String payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\"}";
+		
+		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
+		
+		Request request = new Request.Builder()
+									 .url(adminURL)
+									 .post(body)
+									 .addHeader("Content-Type", "application/json")
+									 .build();
+		
+		httpclient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
 			{
-				if (spectralClanMgmtButton != null)
+				respBody.completeExceptionally(e);
+			}
+			
+			@Override
+			public void onResponse(Call call, Response response) throws IOException
+			{
+				if (!response.isSuccessful())
 				{
-					// If the button isn't null and the members list widget is loaded,
-					// route the response to the exportDone method in the button's class.
-					spectralClanMgmtButton.exportDone(task, status, data);
+					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
 				}
 				else
 				{
-					// If for some reason the button is null, but the members list widget is loaded, 
-					// route the response to the exportDone method in the main class.
-					spectralClanMgmtPlugin.exportDone(task, status, data);
+					try
+					{
+						respBody.complete(button.exportDone(task, response));
+					}
+					finally
+					{
+						response.close();
+					}
 				}
 			}
-			else
-			{
-				// If the members list widget isn't loaded when a response is returned (knowing them, they'll probably close it)
-				// route the response to the exportDone method in the main class.
-				spectralClanMgmtPlugin.exportDone(task, status, data);
-			}
-		}
-		else
-		{
-			shutdown();
-		}
+		});
+		
+		return respBody;
 	}
 	
 	/*
@@ -315,107 +176,62 @@ public class SpectralClanMgmtHttpRequest
 	The player argument is for the name of the local player.
 	The task and player arguments, along with the command text, are included as parameters in the post request.
 	*/
-	protected void postRequestAsyncRecruitMod(String task, SpectralClanMgmtPlugin.SpectralCommand spectralCommand, String player)
+	protected CompletableFuture<String> postRequestAsyncRecruitMod(String task, String spectralCommand, String player)
 	{
-		if (executorService != null)
+		CompletableFuture<String> respBody = new CompletableFuture<>();
+		
+		// URL of the web app for the script.
+		HttpUrl url = HttpUrl.parse(config.spectralDiscordAppURL());
+		String command = spectralCommand.substring(1);
+		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
+		
+		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
+		
+		Request request = new Request.Builder()
+		.url(url)
+		.post(body)
+		.addHeader("Content-Type", "application/json")
+		.build();
+		
+		httpclient.newCall(request).enqueue(new Callback()
 		{
-			executorService.execute(() ->
+			@Override
+			public void onFailure(Call call, IOException e)
 			{
-				try
-				{
-					// URL of the web app for the script.
-					String url = config.spectralDiscordAppURL();
-					String command = spectralCommand.getSpectralCommand().substring(1);
-					String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
-					
-					URL obj = new URL(url);
-					HttpURLConnection con = (HttpURLConnection)obj.openConnection();
-					
-					con.setRequestMethod("POST");
-					con.setRequestProperty("Content-Type", "application/json");
-					
-					con.setDoOutput(true);
-					OutputStream stream = con.getOutputStream();
-					byte[] payloadBytes = payload.getBytes("utf-8");
-					stream.write(payloadBytes, 0, payloadBytes.length);
-					stream.flush();
-					stream.close();
-					
-					int responseCode = con.getResponseCode();
-					
-					BufferedReader incoming = new BufferedReader(new InputStreamReader(con.getInputStream()));
-					String inputLine;
-					StringBuffer response = new StringBuffer();
-					
-					while ((inputLine = incoming.readLine()) != null)
-					{
-						response.append(inputLine);
-					}
-					
-					incoming.close();
-					
-					if (responseCode == 200)
-					{
-						JsonObject resp = new JsonParser().parse(response.toString()).getAsJsonObject();
-						String status = resp.get("status").getAsString();
-						String data = resp.get("data").getAsString();
-						responseReceivedRecruitMod(status, data, spectralCommand);
-					}
-					else
-					{
-						String data = "Something went wrong. The Discord app couldn't process the request. Contact the developer about this issue.";
-						responseReceivedRecruitMod("failure", data, spectralCommand);
-					}
-				}
-				catch (Exception e)
-				{
-					e.printStackTrace();
-				}
-			});
-		}
-	}
-	
-	// This receives the returned value from the postRequestAsyncRecruitMod method.
-	private void responseReceivedRecruitMod(String status, String data, SpectralClanMgmtPlugin.SpectralCommand spectralCommand)
-	{
-		// If the GameState isn't "LOGGED_IN" when the response is received, just shut down. Otherwise, call setRecruitMod.
-		if (client.getGameState() == GameState.LOGGED_IN)
-		{
-			spectralClanMgmtPlugin.setRecruitMod(status, data, spectralCommand);
-		}
-		else
-		{
-			shutdown();
-		}
-	}
-	
-	protected void shutdown()
-	{
-		if (executorService != null)
-		{
-			executorService.shutdown();
-			
-			try 
-			{
-				executorService = null;
-				// Once executorService is null, it's ready to be initialized again.
-			} 
-			catch (Exception e) 
-			{
-				e.printStackTrace();
+				respBody.completeExceptionally(e);
 			}
-		}
+			
+			@Override
+			public void onResponse(Call call, Response response) throws IOException
+			{
+				if (!response.isSuccessful())
+				{
+					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+				}
+				else
+				{
+					try
+					{
+						respBody.complete(spectralClanMgmtPlugin.setModRecruit(response));
+					}
+					finally
+					{
+						response.close();
+					}
+				}
+			}
+		});
+		
+		return respBody;
 	}
 	
-	protected boolean isReady()
+	protected boolean getIsReady()
 	{
-		if (executorService != null)
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
+		return this.isReady;
+	}
+	
+	protected void setIsReady(boolean value)
+	{
+		this.isReady = value;
 	}
 }
