@@ -1,6 +1,9 @@
 package com.spectralclanmgmt;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import javax.inject.Inject;
@@ -219,7 +222,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		log.info("Spectral Clan Mgmt Plugin started!");
 		gameState = client.getGameState();
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
-		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient);
+		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
 		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest);
 		attemptCount = 0;
 		coolDown = -1;

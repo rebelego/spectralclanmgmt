@@ -10,7 +10,8 @@ import javax.inject.Inject;
 @Slf4j
 public class SpectralClanMgmtHttpRequest
 {
-	private final OkHttpClient httpclient;
+	@Inject
+	private OkHttpClient httpclient;
 	
 	private SpectralClanMgmtConfig config;
 	
@@ -22,12 +23,12 @@ public class SpectralClanMgmtHttpRequest
 	
 	private boolean isReady = true;
 	
-	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client, OkHttpClient httpclient)
+	@Inject
+	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client)
 	{
 		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
 		this.config = config;
 		this.client = client;
-		this.httpclient = httpclient;
 		this.button = null;
 	}
 	
