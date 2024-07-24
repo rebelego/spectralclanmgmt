@@ -78,6 +78,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Inject
 	private SpectralClanMgmtHttpRequest httpRequest;
 	
+	@Inject
 	private SpectralClanMgmtButton spectralClanMemberButton;
 	
 	private ClanSettings clanSettings;
@@ -223,8 +224,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 		log.info("Spectral Clan Mgmt Plugin started!");
 		gameState = client.getGameState();
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
-		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client);
-		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest);
+		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient);
+		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest, gson);
 		attemptCount = 0;
 		coolDown = -1;
 		coolDownFinished = true;
@@ -685,12 +686,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private void showCommand(ChatMessage chatMessage, String message)
 	{
 		// In case these commands are ever seen outside of the clan chat, don't replace the command text in the chat.
-		switch (chatMessage.getType())
+		if (chatMessage.getType() != ChatMessageType.CLAN_CHAT)
 		{
-			case CLAN_CHAT:
-				break;
-			default:
-				return;
+			return;
 		}
 		
 		MessageNode messageNode = chatMessage.getMessageNode();

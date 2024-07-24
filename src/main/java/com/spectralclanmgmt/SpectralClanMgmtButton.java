@@ -9,7 +9,7 @@ import net.runelite.api.*;
 import net.runelite.api.widgets.*;
 import net.runelite.client.util.Text;
 import okhttp3.Response;
-
+import javax.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,6 +17,8 @@ import java.util.List;
 
 public class SpectralClanMgmtButton
 {
+	@Inject
+	private Gson gson;
 	private SpectralClanMgmtPlugin plugin;
 	private SpectralClanMgmtConfig config;
 	private final Client client;
@@ -43,7 +45,8 @@ public class SpectralClanMgmtButton
 	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
 	private boolean buttonCreated;
 	
-	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, SpectralClanMgmtHttpRequest httpRequest)
+	@Inject
+	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, SpectralClanMgmtHttpRequest httpRequest, Gson gson)
 	{
 		this.httpRequest = httpRequest;
 		this.chatboxPanelManager = chatboxPanelManager;
@@ -58,6 +61,7 @@ public class SpectralClanMgmtButton
 		memberCurrentName = "";
 		memberOldName = "";
 		memberType = "";
+		this.gson = gson;
 		this.httpRequest.setButton(this);
 	}
 	
@@ -421,8 +425,6 @@ public class SpectralClanMgmtButton
 	// Additional text is appended before the response is displayed depending on the task's value if the export's status is "success".
 	protected String exportDone(String task, Response response) throws IOException
 	{
-		Gson gson = new Gson();
-		
 		if (!response.isSuccessful())
 		{
 			throw new IOException("Error occurred: " + response);
