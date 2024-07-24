@@ -1114,7 +1114,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	protected static boolean isNormalRank(int rank)
 	{
 		// The clan's non-admin ranks. The numbers are the key values in the ranks enum for the 
-		// Gnome Child, Lieutenant, Astral, Sapphire, Emerald, Ruby, Diamond, Dragonstone, and Onyx ranks.
+		// Gnome Child, Lieutenant, Admiral, Astral, Sapphire, Emerald, Ruby, Diamond, Dragonstone, and Onyx ranks.
 		ArrayList<Integer> normalRanks = new ArrayList<>(Arrays.asList(9, 35, 45, 58, 65, 66, 67, 68, 69, 70, 143, 111));
 		
 		if (normalRanks.contains(rank))
