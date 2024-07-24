@@ -620,9 +620,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 						}
 						else
 						{
-							if (commandProcessing)
+							// This could occur if they try to use a command right after the logging in when the plugin is still pulling the data.
+							if (commandProcessing && !ready)
 							{
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You can't use Spectral's commands right now. Wait a minute before trying again. If the issue persists and you're a ranked member of the Spectral clan, contact the developer.", null);
+								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You can't use Spectral's commands right now. Wait a minute before trying again.", null);
 							}
 							else if (attemptCount >= 5)
 							{
