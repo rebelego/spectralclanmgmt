@@ -100,7 +100,7 @@ public class SpectralChatboxPanel
 		}
 	}
 	
-	private void unsafeOpenInput(SpectralClanMgmtPlugin.SpectralInput input)
+	private void unsafeOpenInput(SpectralClanMgmtPlugin.SpectralInput input, int lineNum)
 	{
 		client.runScript(ScriptID.MESSAGE_LAYER_OPEN, 0);
 		
@@ -134,12 +134,12 @@ public class SpectralChatboxPanel
 		Widget c = getContainerWidget();
 		c.deleteAllChildren();
 		c.setOnDialogAbortListener((JavaScriptCallback) ev -> this.unsafeCloseInput());
-		input.open();
+		input.open(lineNum);
 	}
 	
-	public void openInput(SpectralClanMgmtPlugin.SpectralInput input)
+	public void openInput(SpectralClanMgmtPlugin.SpectralInput input, int lineNum)
 	{
-		clientThread.invokeLater(() -> unsafeOpenInput(input));
+		clientThread.invokeLater(() -> unsafeOpenInput(input, lineNum));
 	}
 	
 	public SpectralTextMenuInput openTextMenuInput(String title)

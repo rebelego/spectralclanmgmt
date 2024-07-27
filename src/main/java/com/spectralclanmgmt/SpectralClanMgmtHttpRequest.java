@@ -132,11 +132,34 @@ public class SpectralClanMgmtHttpRequest
 			arg3 = "oldName";
 			arg4 = "memberType";
 		}
+		else if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
+		{
+			arg2 = "player";
+			arg3 = "category";
+		}
+		
+		HttpUrl adminURL;
 		
 		// URL of the web app for the script.
-		HttpUrl adminURL = HttpUrl.parse(config.adminScriptURL());
+		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
+		{
+			adminURL = HttpUrl.parse(config.scriptURL());
+		}
+		else
+		{
+			adminURL = HttpUrl.parse(config.adminScriptURL());
+		}
 		
-		String payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\"}";
+		String payload = "";
+		
+		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
+		{
+			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + thirdArg + "\"}";
+		}
+		else
+		{
+			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\"}";
+		}
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		

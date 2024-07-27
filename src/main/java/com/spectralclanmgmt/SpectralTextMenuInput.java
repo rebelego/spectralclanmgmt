@@ -85,7 +85,7 @@ public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput 
 		return this;
 	}
 	
-	public SpectralTextMenuInput build()
+	public SpectralTextMenuInput build(int lineNum)
 	{
 		if (title == null)
 		{
@@ -97,12 +97,12 @@ public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput 
 			throw new IllegalStateException("You must have at least 1 option.");
 		}
 		
-		chatboxPanelManager.openInput(this);
+		chatboxPanelManager.openInput(this, lineNum);
 		return this;
 	}
 	
 	@Override
-	public void open()
+	public void open(int lineNum)
 	{
 		Widget container = chatboxPanelManager.getContainerWidget();
 		Widget prompt = container.createChild(-1, WidgetType.TEXT);
@@ -110,38 +110,39 @@ public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput 
 		prompt.setText(title);
 		prompt.setTextColor(0x000000);
 		prompt.setFontId(FontID.QUILL_8);
-		
+		prompt.setLineHeight(19);
 		prompt.setXPositionMode(WidgetPositionMode.ABSOLUTE_CENTER);
-		prompt.setOriginalX(0);
 		prompt.setYPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
-		prompt.setOriginalY(16);
-		prompt.setOriginalHeight(28);
 		
-		prompt.setLineHeight(18);
+		int h = prompt.getLineHeight() * lineNum;
+		
+		prompt.setOriginalHeight(h);
+		prompt.setOriginalX(0);
+		prompt.setOriginalY(8);
 		prompt.setXTextAlignment(WidgetTextAlignment.CENTER);
 		prompt.setYTextAlignment(WidgetTextAlignment.CENTER);
 		prompt.setWidthMode(WidgetSizeMode.MINUS);
 		prompt.revalidate();
 		
-		int y = prompt.getRelativeY() + prompt.getHeight() + 2;
-		int height = container.getHeight() - y - 16;
-		int step = height / options.size();
-		int maxStep = options.size() >= 3 ? 25 : 28;
+		int y = prompt.getOriginalY() + prompt.getHeight() + 6;
 		
-		if (step > maxStep)
-		{
-			int ds = step - maxStep;
-			step = maxStep;
-			y += (ds * options.size()) / 2;
-		}
-		
-		int optionNum = 1;
+		int optionNum = 0;
 		
 		for (Entry option : options)
 		{
-			if (optionNum == 1 && options.size() > 1)
+			int optY = 0;
+			
+			if (options.size() > 3)
 			{
-				y += 2;
+				optY = y + (optionNum * 22);
+			}
+			else if (options.size() > 1 && options.size() < 4)
+			{
+				optY = y + (optionNum * 24);
+			}
+			else if (options.size() == 1)
+			{
+				optY = y + 18;
 			}
 			
 			Widget optWidget = container.createChild(-1, WidgetType.TEXT);
@@ -152,8 +153,8 @@ public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput 
 			optWidget.setXPositionMode(WidgetPositionMode.ABSOLUTE_CENTER);
 			optWidget.setYPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
 			optWidget.setOriginalX(0);
-			optWidget.setOriginalY(y);
-			optWidget.setOriginalHeight(20);
+			optWidget.setOriginalY(optY);
+			optWidget.setOriginalHeight(19);
 			
 			optWidget.setXTextAlignment(WidgetTextAlignment.CENTER);
 			optWidget.setYTextAlignment(WidgetTextAlignment.CENTER);
@@ -166,7 +167,6 @@ public class SpectralTextMenuInput extends SpectralClanMgmtPlugin.SpectralInput 
 			optWidget.setHasListener(true);
 			optWidget.revalidate();
 			
-			y = y + step + 2;
 			optionNum += 1;
 		}
 	}

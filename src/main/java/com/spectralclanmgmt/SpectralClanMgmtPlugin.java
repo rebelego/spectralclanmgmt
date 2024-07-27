@@ -156,6 +156,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	my only choice is to remake the classes and include the copyright notices for them.
 	Since this class is tiny and needed for the ChatboxPanelManager and ChatboxTextMenuInput,
 	I'd rather recreate it here as an inner class rather than add a new class file for it.
+	I did end up modifying the open method.
 	 */
 	public abstract static class SpectralInput
 	{
@@ -183,7 +184,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 		 * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		 */
-		public void open()
+		public void open(int lineNum)
 		{
 		}
 		
