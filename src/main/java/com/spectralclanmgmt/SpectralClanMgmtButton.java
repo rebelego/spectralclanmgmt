@@ -43,8 +43,9 @@ public class SpectralClanMgmtButton
 	private boolean buttonCreated;
 	
 	@Inject
-	protected SpectralClanMgmtButton(SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, SpectralClanMgmtHttpRequest httpRequest, Gson gson)
+	protected SpectralClanMgmtButton(SpectralClanMgmtPlugin plugin, SpectralChatboxPanel chatboxPanelManager, SpectralClanMgmtConfig config, Client client, SpectralClanMgmtHttpRequest httpRequest, Gson gson)
 	{
+		this.plugin = plugin;
 		this.httpRequest = httpRequest;
 		this.chatboxPanelManager = chatboxPanelManager;
 		this.config = config;
@@ -828,84 +829,94 @@ public class SpectralClanMgmtButton
 	{
 		chatboxPanelManager.close();
 		
-		if (httpRequest.getIsReady())
+		if (plugin.validAccessKey)
 		{
-			String fArg = "";
-			String sArg = "";
-			String tArg = "";
-			
-			// Before we proceed, we'll check that the script's URL is set and valid.
-			if (plugin.checkURL(config.adminScriptURL()))
+			if (httpRequest.getIsReady())
 			{
-				if (task.equals("add-new"))
-				{
-					// firstArg = newMemberDate
-					// secondArg = newMemberName
-					// thirdArg = localPlayerName
-					fArg = firstArg;
-					String tempPlayerName = secondArg;
-					sArg = Text.sanitize(tempPlayerName);
-					tArg = Text.sanitize(thirdArg);
-				}
-				else if (task.equals("add-alt"))
-				{
-					// firstArg = newMemberDate
-					// secondArg = mainMemberName
-					// thirdArg = newMemberName
-					fArg = firstArg;
-					String tempPlayerName = thirdArg;
-					tArg = Text.sanitize(tempPlayerName);
-					tempPlayerName = secondArg;
-					sArg = Text.sanitize(tempPlayerName);
-				}
-				else if (task.equals("name-change"))
-				{
-					// firstArg = memberCurrentName
-					// secondArg = memberOldName
-					// thirdArg = memberType
-					String tempPlayerName = firstArg;
-					fArg = Text.sanitize(tempPlayerName);
-					tempPlayerName = secondArg;
-					sArg = Text.sanitize(tempPlayerName);
-					tArg = thirdArg;
-				}
-				else if (task.equals("revoke-permission") || task.equals("restore-permission"))
-				{
-					// firstArg = selected member's name
-					// secondArg = blank
-					// thirdArg = permission selection
-					String tempPlayerName = firstArg;
-					fArg = Text.sanitize(tempPlayerName);
-					sArg = secondArg;
-					tArg = thirdArg;
-				}
+				String fArg = "";
+				String sArg = "";
+				String tArg = "";
 				
-				httpRequest.setIsReady(false);
-				
-				httpRequest.postRequestAsyncAdmin(task, fArg, sArg, tArg).whenCompleteAsync((result, ex) ->
+				// Before we proceed, we'll check that the script's URL is set and valid.
+				if (plugin.checkURL(plugin.getAdminURL()))
 				{
-					httpRequest.setIsReady(true);
-					
-					chatboxPanelManager
-					.openTextMenuInput(result)
-					.option("OK", () -> 
+					if (task.equals("add-new"))
 					{
+						// firstArg = newMemberDate
+						// secondArg = newMemberName
+						// thirdArg = localPlayerName
+						fArg = firstArg;
+						String tempPlayerName = secondArg;
+						sArg = Text.sanitize(tempPlayerName);
+						tArg = Text.sanitize(thirdArg);
+					}
+					else if (task.equals("add-alt"))
+					{
+						// firstArg = newMemberDate
+						// secondArg = mainMemberName
+						// thirdArg = newMemberName
+						fArg = firstArg;
+						String tempPlayerName = thirdArg;
+						tArg = Text.sanitize(tempPlayerName);
+						tempPlayerName = secondArg;
+						sArg = Text.sanitize(tempPlayerName);
+					}
+					else if (task.equals("name-change"))
+					{
+						// firstArg = memberCurrentName
+						// secondArg = memberOldName
+						// thirdArg = memberType
+						String tempPlayerName = firstArg;
+						fArg = Text.sanitize(tempPlayerName);
+						tempPlayerName = secondArg;
+						sArg = Text.sanitize(tempPlayerName);
+						tArg = thirdArg;
+					}
+					else if (task.equals("revoke-permission") || task.equals("restore-permission"))
+					{
+						// firstArg = selected member's name
+						// secondArg = blank
+						// thirdArg = permission selection
+						String tempPlayerName = firstArg;
+						fArg = Text.sanitize(tempPlayerName);
+						sArg = secondArg;
+						tArg = thirdArg;
+					}
+					
+					httpRequest.setIsReady(false);
+					
+					httpRequest.postRequestAsyncAdmin(task, fArg, sArg, tArg).whenCompleteAsync((result, ex) ->
+					{
+						httpRequest.setIsReady(true);
 						removeListeners();
-					})
-					.build(2);
-				});
-			}
-			else
-			{
-				chatboxPanelManager
-				.openTextMenuInput("Wait a minute before trying again. If you continue to get this message,<br>contact the developer about the admin URL.")
-				.option("OK", () ->
+						
+						chatboxPanelManager
+						.openTextMenuInput(result)
+						.option("OK", () -> chatboxPanelManager.close())
+						.build(2);
+					});
+				}
+				else
 				{
 					httpRequest.setIsReady(true);
 					removeListeners();
-				})
-				.build(2);
+					
+					chatboxPanelManager
+					.openTextMenuInput("Wait a minute before trying again. If you continue to get this message,<br>contact the developer about the admin URL.")
+					.option("OK", () -> chatboxPanelManager.close())
+					.build(2);
+				}
 			}
+		}
+		else
+		{
+			httpRequest.setIsReady(true);
+			removeListeners();
+			
+			chatboxPanelManager
+			.openTextMenuInput("The access key set in the plugin's settings is not valid.<br>Set a valid access key in the settings before trying again.")
+			.option("OK", () -> chatboxPanelManager.close())
+			.build(2);
 		}
 	}
 	
@@ -1274,39 +1285,59 @@ public class SpectralClanMgmtButton
 					}
 				}
 				
-				// Putting this check here in case the player was an admin-ranked member when the button was created
-				// and their rank is changed to a non-admin one while the button exists.
-				if (SpectralClanMgmtPlugin.isAdminRank(adminRank))
+				if (!config.memberKey().equals(""))
 				{
-					// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
-					// a prompt in the chatbox.
-					if (SpectralClanMgmtPlugin.checkURL(config.adminScriptURL()))
+					if (plugin.validAccessKey)
 					{
-						if (httpRequest.getIsReady())
+						// Putting this check here in case the player was an admin-ranked member when the button was created
+						// and their rank is changed to a non-admin one while the button exists.
+						if (SpectralClanMgmtPlugin.isAdminRank(adminRank))
 						{
-							// wasClicked is used as a flag that stops the button from reacting to additional clicks
-							// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
-							// We don't want them clicking the button then starting the export process, only to click the button
-							// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
-							if (wasClicked == false)
+							// If the script's url is missing or isn't valid, we don't want anything to happen when the button is clicked beyond
+							// a prompt in the chatbox.
+							if (SpectralClanMgmtPlugin.checkURL(plugin.getAdminURL()))
 							{
-								wasClicked = true;
-								
+								if (httpRequest.getIsReady())
+								{
+									// wasClicked is used as a flag that stops the button from reacting to additional clicks
+									// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
+									// We don't want them clicking the button then starting the export process, only to click the button
+									// again at a point when everything wouldn't be reset (like after selecting an alt but not a main yet).
+									if (wasClicked == false)
+									{
+										wasClicked = true;
+										
+										chatboxPanelManager
+										.openTextMenuInput("Select an option below or click cancel to exit..")
+										.option("Export New Member", () -> newMemberExport())
+										.option("Export Name Change", () -> nameChangeCheckPreReq())
+										.option("Export Permission Change", () -> permissionChangeExport())
+										.option("Cancel", () -> cancelOptions())
+										.build(1);
+									}
+								}
+								else
+								{
+									// If this occurs, then the response from a post request hasn't been received yet.
+									// This will automatically be closed, if it's not already, when the request's response is received.
+									chatboxPanelManager
+									.openTextMenuInput("You can't start another export right now.<br>Wait a minute before trying again.")
+									.option("OK", () -> chatboxPanelManager.close())
+									.build(2);
+								}
+							}
+							else
+							{
 								chatboxPanelManager
-								.openTextMenuInput("Select an option below or click cancel to exit..")
-								.option("Export New Member", () -> newMemberExport())
-								.option("Export Name Change", () -> nameChangeCheckPreReq())
-								.option("Export Permission Change", () -> permissionChangeExport())
-								.option("Cancel", () -> cancelOptions())
-								.build(1);
+								.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
+								.option("OK", () -> chatboxPanelManager.close())
+								.build(2);
 							}
 						}
 						else
 						{
-							// If this occurs, then the response from a post request hasn't been received yet.
-							// This will automatically be closed, if it's not already, when the request's response is received.
 							chatboxPanelManager
-							.openTextMenuInput("You can't start another export right now.<br>Wait a minute before trying again.")
+							.openTextMenuInput("Rank check failed. You don't have an admin rank anymore.<br>Contact the developer if you do have an admin rank still.")
 							.option("OK", () -> chatboxPanelManager.close())
 							.build(2);
 						}
@@ -1314,7 +1345,7 @@ public class SpectralClanMgmtButton
 					else
 					{
 						chatboxPanelManager
-						.openTextMenuInput("Wait a minute before trying again. If you still get this message,<br>contact the developer about the admin URL.")
+						.openTextMenuInput("The access key in the plugin's settings is not valid.<br>Set your access key and wait a minute before trying again.")
 						.option("OK", () -> chatboxPanelManager.close())
 						.build(2);
 					}
@@ -1322,7 +1353,7 @@ public class SpectralClanMgmtButton
 				else
 				{
 					chatboxPanelManager
-					.openTextMenuInput("Rank check failed. You don't seem to have an admin rank anymore.<br>Contact the developer if you do have an admin rank still.")
+					.openTextMenuInput("Your access key is not set in the plugin's settings.<br>Set your access key and wait a minute before trying again.")
 					.option("OK", () -> chatboxPanelManager.close())
 					.build(2);
 				}

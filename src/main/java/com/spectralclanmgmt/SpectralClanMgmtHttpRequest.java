@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import java.io.*;
 import java.util.concurrent.*;
+
 import okhttp3.*;
 import javax.inject.Inject;
 
@@ -15,7 +16,7 @@ public class SpectralClanMgmtHttpRequest
 	
 	private SpectralClanMgmtConfig config;
 	
-	private SpectralClanMgmtPlugin spectralClanMgmtPlugin;
+	private SpectralClanMgmtPlugin plugin;
 	
 	private SpectralClanMgmtButton button;
 	
@@ -24,9 +25,9 @@ public class SpectralClanMgmtHttpRequest
 	private boolean isReady = true;
 	
 	@Inject
-	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin spectralClanMgmtPlugin, SpectralClanMgmtConfig config, Client client, OkHttpClient httpclient)
+	protected SpectralClanMgmtHttpRequest(SpectralClanMgmtPlugin plugin, SpectralClanMgmtConfig config, Client client, OkHttpClient httpclient)
 	{
-		this.spectralClanMgmtPlugin = spectralClanMgmtPlugin;
+		this.plugin = plugin;
 		this.config = config;
 		this.client = client;
 		this.httpclient = httpclient;
@@ -52,6 +53,7 @@ public class SpectralClanMgmtHttpRequest
 		HttpUrl url = HttpUrl.parse(config.scriptURL()).newBuilder()
 		.addQueryParameter("configLink", configLink)
 		.addQueryParameter("player", player)
+		.addQueryParameter("accessKey", config.memberKey())
 		.build();
 		
 		Request request = new Request.Builder()
@@ -78,7 +80,7 @@ public class SpectralClanMgmtHttpRequest
 				{
 					try
 					{
-						respBody.complete(spectralClanMgmtPlugin.setPluginData(response));
+						respBody.complete(plugin.setPluginData(response));
 					}
 					finally
 					{
@@ -93,17 +95,6 @@ public class SpectralClanMgmtHttpRequest
 	
 	/* 
 	This is for the Admin-related export tasks in the SpectralClanMgmtButton class (new member additions and name changes).
-	
-	 1. New Main member: It will send the in-game name of the new clan member, their clan join date, and the admin's name to the clan's web app.
-	 2. New Alt Member: It will send the in-game name of the new clan member, their clan join date, 
-	    the name of the new member's Main in the clan, and the admin's name to the clan's web app.
-	 3. Member Name Change: It will send the current in-game name and the previous in-game name of the selected clan member, 
-	    and their clan member type ('main', 'alt', 'both') to the clan's web app.
-	    The member type is not a personally identifying value linked to the player's data.
-	    
-	 * firstArg will either be the new member's join date OR the current name of a member name change.
-	 * secondArg will either be the name of the new Main OR the name of the new Alt's Main OR the previous name of a member name change.
-	 * thirdArg will either be the name of the local player OR the name of the new Alt member OR member type ('main', 'alt', or 'both') from name change export.
 	 */
 	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg)
 	{
@@ -147,7 +138,7 @@ public class SpectralClanMgmtHttpRequest
 		}
 		else
 		{
-			adminURL = HttpUrl.parse(config.adminScriptURL());
+			adminURL = HttpUrl.parse(plugin.getAdminURL());
 		}
 		
 		String payload = "";
@@ -213,7 +204,7 @@ public class SpectralClanMgmtHttpRequest
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		// URL of the web app for the script.
-		HttpUrl url = HttpUrl.parse(config.spectralDiscordAppURL());
+		HttpUrl url = HttpUrl.parse(plugin.getDiscordURL());
 		String command = spectralCommand.substring(1);
 		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
 		
@@ -244,7 +235,55 @@ public class SpectralClanMgmtHttpRequest
 				{
 					try
 					{
-						respBody.complete(spectralClanMgmtPlugin.setModRecruit(response));
+						respBody.complete(plugin.setModRecruit(response));
+					}
+					finally
+					{
+						response.close();
+					}
+				}
+			}
+		});
+		
+		return respBody;
+	}
+	
+	protected CompletableFuture<String> postRequestAsyncAccessKey(String task, String player)
+	{
+		CompletableFuture<String> respBody = new CompletableFuture<>();
+		
+		// URL of the web app for the script.
+		HttpUrl url = HttpUrl.parse(config.scriptURL());
+		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\"}";
+		
+		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
+		
+		Request request = new Request.Builder()
+		.url(url)
+		.post(body)
+		.addHeader("Content-Type", "application/json")
+		.build();
+		
+		httpclient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				respBody.completeExceptionally(e);
+			}
+			
+			@Override
+			public void onResponse(Call call, Response response) throws IOException
+			{
+				if (!response.isSuccessful())
+				{
+					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+				}
+				else
+				{
+					try
+					{
+						respBody.complete(plugin.setAccessKey(response));
 					}
 					finally
 					{

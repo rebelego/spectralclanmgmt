@@ -9,8 +9,8 @@ public interface SpectralClanMgmtConfig extends Config
 {
 	@ConfigItem(
 	keyName = "scriptURL",
-	name = "Spectral Web App URL",
-	description = "The URL of Spectral's web app for receiving POST requests from this plugin.",
+	name = "Spectral's Web App URL",
+	description = "The URL of Spectral's Web App.",
 	position = 0
 	)
 	default String scriptURL()
@@ -19,40 +19,22 @@ public interface SpectralClanMgmtConfig extends Config
 	}
 	
 	@ConfigItem(
-	keyName = "adminScriptURL",
-	name = "",
-	description = "",
-	hidden = true
+	keyName = "memberKey",
+	name = "Access Key",
+	description = "The unique access key assigned to each member.",
+	position = 1
 	)
-	default String adminScriptURL()
+	default String memberKey()
 	{
 		return "";
 	}
 	
 	@ConfigItem(
-	keyName = "adminScriptURL",
+	keyName = "memberKey",
 	name = "",
 	description = "",
+	position = 2,
 	hidden = true
 	)
-	void setAdminScriptURL(String URL);
-	
-	@ConfigItem(
-	keyName = "spectralDiscordAppURL",
-	name = "",
-	description = "",
-	hidden = true
-	)
-	default String spectralDiscordAppURL()
-	{
-		return "";
-	}
-	
-	@ConfigItem(
-	keyName = "spectralDiscordAppURL",
-	name = "",
-	description = "",
-	hidden = true
-	)
-	void setSpectralDiscordAppURL(String URL);
+	void setMemberKey(String key);
 }

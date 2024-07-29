@@ -81,6 +81,12 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Inject
 	private SpectralClanMgmtButton spectralClanMemberButton;
 	
+	@Getter
+	private String adminURL = "";
+	
+	@Getter
+	private String discordURL = "";
+	
 	private ClanSettings clanSettings;
 	
 	private List<ClanMember> clanMembers;
@@ -104,11 +110,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private boolean canUseDiscordCommands;
 	private boolean canUseSpectralCommand;
 	
+	protected boolean validAccessKey;
+	
 	private boolean pluginLoaded;
 	
 	private boolean commandProcessing;
 	
-	private boolean memberWidgetLoaded = false;
+	private boolean memberWidgetLoaded;
 	
 	private boolean firstGameTick;
 	
@@ -147,6 +155,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private final String COMMAND_SPECTRAL = "!spectral";
 	
 	private final String COMMAND_MOD = "!mod";
+	
+	private final String COMMAND_KEY = "!key";
 	
 	private final String COMMAND_RECRUIT = "!recruit";
 	
@@ -226,7 +236,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		gameState = client.getGameState();
 		spectralPhrases = new SpectralClanMgmtCommandPhrases();
 		httpRequest = new SpectralClanMgmtHttpRequest(this, config, client, okHttpClient);
-		spectralClanMemberButton = new SpectralClanMgmtButton(chatboxPanelManager, config, client, httpRequest, gson);
 		attemptCount = 0;
 		coolDown = -1;
 		coolDownFinished = true;
@@ -234,12 +243,17 @@ public class SpectralClanMgmtPlugin extends Plugin
 		gameTickCount = 0;
 		previousPhrasePosition = -1;
 		firstGameTick = false;
+		adminURL = "";
+		discordURL = "";
 		canUseSpectralCommand = false;
 		canUseDiscordCommands = false;
+		validAccessKey = false;
 		ready = false;
 		pluginLoaded = false;
 		commandProcessing = false;
+		spectralClanMemberButton = new SpectralClanMgmtButton(this, chatboxPanelManager, config, client, httpRequest, gson);
 		chatCommandManager.registerCommand(COMMAND_SPECTRAL,this::showCommand, this::getCommand);
+		chatCommandManager.registerCommand(COMMAND_KEY,this::showCommand, this::getCommand);
 		chatCommandManager.registerCommand(COMMAND_MOD,this::showCommand, this::getCommand);
 		chatCommandManager.registerCommand(COMMAND_RECRUIT,this::showCommand, this::getCommand);
 	}
@@ -248,11 +262,16 @@ public class SpectralClanMgmtPlugin extends Plugin
 	protected void shutDown() throws Exception
 	{
 		chatboxPanelManager.shutdown();
+		adminURL = "";
+		discordURL = "";
+		canUseSpectralCommand = false;
+		canUseDiscordCommands = false;
 		spectralPhrases = null;
 		httpRequest = null;
 		chatCommandManager.unregisterCommand(COMMAND_SPECTRAL);
 		chatCommandManager.unregisterCommand(COMMAND_MOD);
 		chatCommandManager.unregisterCommand(COMMAND_RECRUIT);
+		chatCommandManager.unregisterCommand(COMMAND_KEY);
 		log.info("Spectral Clan Mgmt Plugin stopped!");
 	}
 	
@@ -316,16 +335,23 @@ public class SpectralClanMgmtPlugin extends Plugin
 				}
 			}
 			
+			if (!commandProcessing && ready && attemptCount < 5 && !config.memberKey().equals("") && (permissionCheckTimer >= permissionCheckTime))
+			{
+				gameTickCount = 1;
+				pluginLoaded = false;
+			}
+			
 			if (gameTickCount == 1)
 			{
 				gameTickCount = -1;
 				
-				if (!commandProcessing && !pluginLoaded && attemptCount < 5)
+				if (!commandProcessing && !pluginLoaded && !config.memberKey().equals("") && attemptCount < 5)
 				{
 					commandProcessing = true;
 					final String player = Text.sanitize(client.getLocalPlayer().getName());
 					final int rank = getLocalPlayerRank(Optional.empty());
 					executor = Executors.newSingleThreadScheduledExecutor();
+					
 					executor.execute(() ->
 					{
 						try
@@ -337,9 +363,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 							return;
 						}
 					});
+					
 					executor.shutdown();
 				}
-				else if (commandProcessing && !pluginLoaded && attemptCount < 5)
+				else if (commandProcessing && !config.memberKey().equals("") && !pluginLoaded && attemptCount < 5)
 				{
 					firstGameTick = false;
 					pluginLoaded = false;
@@ -365,8 +392,27 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			if (config.scriptURL().equals(""))
 			{
-				config.setAdminScriptURL("");
-				config.setSpectralDiscordAppURL("");
+				adminURL = "";
+				discordURL = "";
+				canUseDiscordCommands = false;
+				canUseSpectralCommand = false;
+				validAccessKey = false;
+			}
+			else
+			{
+				attemptCount = 0;
+			}
+			
+			firstGameTick = false;
+			pluginLoaded = false;
+			ready = false;
+		}
+		else if (event.getGroup().equals("spectralclanmgmt") && event.getKey().equals("memberKey"))
+		{
+			if (config.memberKey().equals(""))
+			{
+				adminURL = "";
+				discordURL = "";
 				canUseDiscordCommands = false;
 				canUseSpectralCommand = false;
 			}
@@ -375,6 +421,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 				attemptCount = 0;
 			}
 			
+			validAccessKey = false;
 			firstGameTick = false;
 			pluginLoaded = false;
 			ready = false;
@@ -392,14 +439,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			if (getLocalPlayerRank(Optional.empty()) == 0)
 			{
-				config.setAdminScriptURL("");
-				config.setSpectralDiscordAppURL("");
+				adminURL = "";
+				discordURL = "";
 				return;
 			}
 			
 			if (!isAdminRank(getLocalPlayerRank(Optional.empty())))
 			{
-				config.setAdminScriptURL("");
+				adminURL = "";
 			}
 		}
 		else if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
@@ -451,8 +498,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 			
 			if (getLocalPlayerRank(Optional.empty()) == 0)
 			{
-				config.setAdminScriptURL("");
-				config.setSpectralDiscordAppURL("");
+				adminURL = "";
+				discordURL = "";
 			}
 			
 			members.clear();
@@ -472,56 +519,103 @@ public class SpectralClanMgmtPlugin extends Plugin
 	@Subscribe
 	public void onSpectralCommand(SpectralCommand spectralCommand)
 	{
-		if (permissionCheckTimer == -1 || permissionCheckTimer >= permissionCheckTime)
+		if (!spectralCommand.getSpectralCommand().equals("!key"))
 		{
-			String player = Text.sanitize(spectralCommand.getPlayer());
-			int rank = spectralCommand.getRank();
-			
-			executor = Executors.newSingleThreadScheduledExecutor();
-			
-			executor.execute(() ->
+			if (permissionCheckTimer == -1 || permissionCheckTimer >= permissionCheckTime)
 			{
-				try
+				String player = Text.sanitize(spectralCommand.getPlayer());
+				int rank = spectralCommand.getRank();
+				
+				executor = Executors.newSingleThreadScheduledExecutor();
+				
+				executor.execute(() ->
 				{
-					boolean result = CompletableFuture.supplyAsync(() -> getPluginData(rank, player, spectralCommand.getSpectralCommand()))
-					.thenApplyAsync(permissionResult ->
+					try
 					{
-						if (spectralCommand.getSpectralCommand().equalsIgnoreCase("!spectral"))
+						boolean result = CompletableFuture.supplyAsync(() -> getPluginData(rank, player, spectralCommand.getSpectralCommand()))
+						.thenApplyAsync(permissionResult ->
 						{
-							return getSpectral(spectralCommand, permissionResult);
+							if (spectralCommand.getSpectralCommand().equalsIgnoreCase("!spectral"))
+							{
+								return getSpectral(spectralCommand, permissionResult);
+							}
+							else
+							{
+								return getModRecruit(spectralCommand, permissionResult, discordURL);
+							}
+						})
+						.thenApplyAsync(res ->
+						{
+							commandProcessing = false;
+							permissionCheckTimer = 0;
+							coolDown = 0;
+							coolDownFinished = false;
+							return res;
+						})
+						.join();
+						
+						if (result)
+						{
+							spectralCommand.getChatInput().resume();
 						}
 						else
 						{
-							String discordLink = config.spectralDiscordAppURL();
-							return getModRecruit(spectralCommand, permissionResult, discordLink);
+							spectralCommand.getChatInput().consume();
 						}
-					})
-					.thenApplyAsync(res ->
-					{
-						commandProcessing = false;
-						permissionCheckTimer = 0;
-						coolDown = 0;
-						coolDownFinished = false;
-						return res;
-					})
-					.join();
-					
-					if (result)
-					{
-						spectralCommand.getChatInput().resume();
 					}
-					else
+					finally
 					{
-						spectralCommand.getChatInput().consume();
+						return;
 					}
-				}
-				finally
+				});
+				
+				executor.shutdown();
+			}
+			else
+			{
+				executor = Executors.newSingleThreadScheduledExecutor();
+				
+				executor.execute(() ->
 				{
-					return;
-				}
-			});
-			
-			executor.shutdown();
+					try
+					{
+						boolean result = CompletableFuture.supplyAsync(() ->
+						{
+							if (spectralCommand.getSpectralCommand().equalsIgnoreCase("!spectral"))
+							{
+								return getSpectral(spectralCommand, canUseSpectralCommand);
+							}
+							else
+							{
+								return getModRecruit(spectralCommand, canUseDiscordCommands, discordURL);
+							}
+						})
+						.thenApplyAsync(res ->
+						{
+							commandProcessing = false;
+							coolDown = 0;
+							coolDownFinished = false;
+							return res;
+						})
+						.join();
+						
+						if (result)
+						{
+							spectralCommand.getChatInput().resume();
+						}
+						else
+						{
+							spectralCommand.getChatInput().consume();
+						}
+					}
+					finally
+					{
+						return;
+					}
+				});
+				
+				executor.shutdown();
+			}
 		}
 		else
 		{
@@ -533,15 +627,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 				{
 					boolean result = CompletableFuture.supplyAsync(() ->
 					{
-						if (spectralCommand.getSpectralCommand().equalsIgnoreCase("!spectral"))
-						{
-							return getSpectral(spectralCommand, canUseSpectralCommand);
-						}
-						else
-						{
-							String discordLink = config.spectralDiscordAppURL();
-							return getModRecruit(spectralCommand, canUseDiscordCommands, discordLink);
-						}
+						return getAccessKey(spectralCommand.getPlayer(), config.scriptURL());
 					})
 					.thenApplyAsync(res ->
 					{
@@ -552,14 +638,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 					})
 					.join();
 					
-					if (result)
-					{
-						spectralCommand.getChatInput().resume();
-					}
-					else
-					{
-						spectralCommand.getChatInput().consume();
-					}
+					spectralCommand.getChatInput().consume();
 				}
 				finally
 				{
@@ -604,59 +683,133 @@ public class SpectralClanMgmtPlugin extends Plugin
 							return true;
 						}
 						
-						if (!commandProcessing && attemptCount < 5 && coolDownFinished && ready)
+						if (!message.trim().toLowerCase().equals("!key"))
 						{
-							commandProcessing = true;
-							coolDown = -1;
-							coolDownFinished = false;
-							
-							if (permissionCheckTimer == -1 || permissionCheckTimer >= permissionCheckTime)
+							if (config.memberKey().equals(""))
 							{
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "One moment, checking permissions again. Your command will be executed once the check is done.", null);
+								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Your access key is not set in the plugin's settings. If the issue persists when your access key is set and you're a ranked member of Spectral, contact the developer.", null);
+								return true;
 							}
 							
-							String command = message.trim().toLowerCase();
-							SpectralCommand spectralCommand = new SpectralCommand(player, rank, command, chatInput);
-							eventBus.post(spectralCommand);
+							if (!validAccessKey)
+							{
+								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Your access key is not valid. If the issue persists when your access key is valid and you're a ranked member of Spectral, contact the developer.", null);
+								return true;
+							}
+						}
+						
+						if (!message.trim().toLowerCase().equals("!key"))
+						{
+							if (!commandProcessing && attemptCount < 5 && coolDownFinished && ready && validAccessKey && !config.memberKey().equals(""))
+							{
+								commandProcessing = true;
+								coolDown = -1;
+								coolDownFinished = false;
+								
+								if (permissionCheckTimer == -1 || permissionCheckTimer >= permissionCheckTime)
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "One moment, checking permissions again. Your command will be executed once the check is done.", null);
+								}
+								
+								String command = message.trim().toLowerCase();
+								SpectralCommand spectralCommand = new SpectralCommand(player, rank, command, chatInput);
+								eventBus.post(spectralCommand);
+							}
+							else
+							{
+								// This could occur if they try to use a command right after the logging in when the plugin is still pulling the data.
+								if (commandProcessing && !ready)
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You can't use Spectral's commands right now. Wait a minute before trying again.", null);
+								}
+								else if (attemptCount >= 5)
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The command could not be completed because your permissions couldn't be verified. Make sure a valid URL and access key is set in the plugin's settings for Spectral's Web App URL. If the issue persists even though the URL and access key are correct, and you're a ranked member of Spectral, contact the developer.", null);
+								}
+								else if (!coolDownFinished)
+								{
+									String msg = "";
+									
+									if (coolDown != -1)
+									{
+										int waitTime = (int)Math.round(0.6 * (coolDownTime - coolDown));
+										
+										if (waitTime > 1 || waitTime < 1)
+										{
+											msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
+										}
+										else if (waitTime == 1)
+										{
+											msg = "You need to wait " + waitTime + " more second before you can use one of Spectral's commands again.";
+										}
+									}
+									else
+									{
+										msg = "You need to wait for the previous command to finish before you can use one of Spectral's commands again.";
+									}
+									
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null);
+								}
+								else if (!ready)
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The plugin's data hasn't finished loading yet. Wait a minute before trying again.", null);
+								}
+								else if (!validAccessKey || config.memberKey().equals(""))
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The command could not be completed because your access key is invalid. Set a valid access key in the plugin's settings before trying again. If the issue persists even though the access key is correct, and you're a ranked member of Spectral, contact the developer.", null);
+								}
+							}
 						}
 						else
 						{
-							// This could occur if they try to use a command right after the logging in when the plugin is still pulling the data.
-							if (commandProcessing && !ready)
+							if (!commandProcessing && attemptCount < 5 && coolDownFinished && !validAccessKey)
 							{
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You can't use Spectral's commands right now. Wait a minute before trying again.", null);
-							}
-							else if (attemptCount >= 5)
-							{
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The command could not be completed because your permissions couldn't be verified. Make sure a valid URL is set in the plugin's settings for Spectral's Web App URL. If the issue persists even though the URL is correct and you're a ranked member of Spectral, contact the developer.", null);
-							}
-							else if (!coolDownFinished)
-							{
-								String msg = "";
+								commandProcessing = true;
+								coolDown = -1;
+								coolDownFinished = false;
 								
-								if (coolDown != -1)
+								String command = message.trim().toLowerCase();
+								SpectralCommand spectralCommand = new SpectralCommand(player, rank, command, chatInput);
+								eventBus.post(spectralCommand);
+							}
+							else
+							{
+								if (commandProcessing)
 								{
-									int waitTime = (int)Math.round(0.6 * (coolDownTime - coolDown));
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You can't use Spectral's commands right now. Wait a minute before trying again.", null);
+								}
+								else if (attemptCount >= 5)
+								{
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The command could not be completed because your permissions couldn't be verified. Make sure a valid URL and access key is set in the plugin's settings for Spectral's Web App URL. If the issue persists even though the URL and access key are correct, and you're a ranked member of Spectral, contact the developer.", null);
+								}
+								else if (!coolDownFinished)
+								{
+									String msg = "";
 									
-									if (waitTime > 1 || waitTime < 1)
+									if (coolDown != -1)
 									{
-										msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
+										int waitTime = (int)Math.round(0.6 * (coolDownTime - coolDown));
+										
+										if (waitTime > 1 || waitTime < 1)
+										{
+											msg = "You need to wait " + waitTime + " more seconds before you can use one of Spectral's commands again.";
+										}
+										else if (waitTime == 1)
+										{
+											msg = "You need to wait " + waitTime + " more second before you can use one of Spectral's commands again.";
+										}
 									}
-									else if (waitTime == 1)
+									else
 									{
-										msg = "You need to wait " + waitTime + " more second before you can use one of Spectral's commands again.";
+										msg = "You need to wait for the previous command to finish before you can use one of Spectral's commands again.";
 									}
+									
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null);
 								}
-								else
+								else if (validAccessKey)
 								{
-									msg = "You need to wait for the previous command to finish before you can use one of Spectral's commands again.";
+									client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "You already have a valid access key, there's no reason for you to use this command.", null);
 								}
-								
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null);
-							}
-							else if (!ready)
-							{
-								client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The plugin's data hasn't finished loading yet. Wait a minute before trying again.", null);
 							}
 						}
 					}
@@ -665,10 +818,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 			
 			if (clan == null || (clan != null && !clan.getName().equals("Spectral")) || rank == 0 || (rank != 0 && !isNormalRank(rank) && !isAdminRank(rank)))
 			{
-				config.setSpectralDiscordAppURL("");
-				config.setAdminScriptURL("");
+				adminURL = "";
+				discordURL = "";
 				canUseSpectralCommand = false;
 				canUseDiscordCommands = false;
+				validAccessKey = false;
 				pluginLoaded = true;
 				commandProcessing = false;
 				ready = true;
@@ -693,6 +847,16 @@ public class SpectralClanMgmtPlugin extends Plugin
 			return;
 		}
 		
+		if (config.memberKey().equals(""))
+		{
+			return;
+		}
+		
+		if (!validAccessKey)
+		{
+			return;
+		}
+		
 		MessageNode messageNode = chatMessage.getMessageNode();
 		
 		if (messageNode.getValue().trim().equalsIgnoreCase("!recruit") || messageNode.getValue().trim().equalsIgnoreCase("!mod") || messageNode.getValue().trim().equalsIgnoreCase("!spectral"))
@@ -707,6 +871,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			
 			updateChat(messageNode);
+		}
+		else
+		{
+			return;
 		}
 	}
 	
@@ -760,15 +928,25 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	protected boolean spectralAdminChecks()
 	{
+		if (config.memberKey().equals(""))
+		{
+			return false;
+		}
+		
+		if (!validAccessKey)
+		{
+			return false;
+		}
+		
 		clanSettings = client.getClanSettings(0);
 		
 		if (clanSettings.getName().equals("Spectral"))
 		{
 			// Since this part of the plugin is meant solely for the admin members of Spectral to use, 
-			// we don't want the button to be created if the local player's rank isn't an admin one.
+			// we don't want the button to be created if the local player's rank isn't an admin one and they don't have their access key.
 			if (isAdminRank(getLocalPlayerRank(Optional.empty())))
 			{
-				if (checkURL(config.adminScriptURL()))
+				if (checkURL(adminURL))
 				{
 					if (members != null)
 					{
@@ -816,14 +994,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 				return "attempt-fail";
 			}
 			
-			if (rank == 0 || (!isNormalRank(rank) && !isAdminRank(rank)) || !checkURL(config.scriptURL()))
+			if (rank == 0 || (!isNormalRank(rank) && !isAdminRank(rank)) || !checkURL(config.scriptURL()) || config.memberKey().equals(""))
 			{
 				return "perma-fail";
 			}
 			
 			if (isNormalRank(rank))
 			{
-				config.setAdminScriptURL("");
+				adminURL = "";
 			}
 			
 			String configLink = "";
@@ -847,8 +1025,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			if (res.equalsIgnoreCase("perma-fail"))
 			{
-				config.setSpectralDiscordAppURL("");
-				config.setAdminScriptURL("");
+				adminURL = "";
+				discordURL = "";
 				
 				if (spectralPhrases != null)
 				{
@@ -857,6 +1035,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 				
 				canUseSpectralCommand = false;
 				canUseDiscordCommands = false;
+				validAccessKey = false;
 				pluginLoaded = true;
 				attemptCount = 5;
 				ready = true;
@@ -944,9 +1123,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			return "failure";
 		}
 		
-		String discordURL = "";
-		String adminURL = "";
-		
 		JsonArray permission = resp.get("permission").getAsJsonArray();
 		int permissionTime = resp.get("permissionTime").getAsInt();
 		int downTime = resp.get("downTime").getAsInt();
@@ -957,6 +1133,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		if (conLink.size() == 1)
 		{
 			links[0] = String.valueOf(conLink.get(0));
+			adminURL = "";
 			discordURL = links[0].substring(1, links[0].length() - 1);
 		}
 		else if (conLink.size() == 2)
@@ -967,28 +1144,41 @@ public class SpectralClanMgmtPlugin extends Plugin
 			adminURL = links[1].substring(1, links[1].length() - 1);
 		}
 		
-		config.setSpectralDiscordAppURL(discordURL);
-		config.setAdminScriptURL(adminURL);
+		validAccessKey = permission.get(0).getAsBoolean();
+		canUseSpectralCommand = permission.get(1).getAsBoolean();
+		canUseDiscordCommands = permission.get(2).getAsBoolean();
 		
-		canUseSpectralCommand = permission.get(0).getAsBoolean();
-		canUseDiscordCommands = permission.get(1).getAsBoolean();
-		
-		if (phraseList.trim() != "")
+		if (validAccessKey)
 		{
-			String[] phrases = phraseList.split("\\;");
-			
-			if (spectralPhrases != null)
+			if (phraseList.trim() != "")
 			{
-				spectralPhrases.setPhrases(phrases);
+				String[] phrases = phraseList.split("\\;");
+				
+				if (spectralPhrases != null)
+				{
+					spectralPhrases.setPhrases(phrases);
+				}
+				else
+				{
+					spectralPhrases = new SpectralClanMgmtCommandPhrases();
+					spectralPhrases.setPhrases(phrases);
+				}
 			}
 			else
 			{
-				spectralPhrases = new SpectralClanMgmtCommandPhrases();
-				spectralPhrases.setPhrases(phrases);
+				if (spectralPhrases != null)
+				{
+					spectralPhrases.setPhrases(null);
+				}
 			}
 		}
 		else
 		{
+			canUseSpectralCommand = false;
+			canUseDiscordCommands = false;
+			discordURL = "";
+			adminURL = "";
+			
 			if (spectralPhrases != null)
 			{
 				spectralPhrases.setPhrases(null);
@@ -1141,8 +1331,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 			ready = false;
 			pluginLoaded = false;
 			commandProcessing = false;
-			config.setAdminScriptURL("");
-			config.setSpectralDiscordAppURL("");
+			adminURL = "";
+			discordURL = "";
 			canUseSpectralCommand = false;
 			canUseDiscordCommands = false;
 			previousPhrasePosition = -1;
@@ -1285,6 +1475,85 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		
 		stat = resp.get("status").getAsString();
+		
+		return stat;
+	}
+	
+	private Boolean getAccessKey(String playerName, String url)
+	{
+		String player = Text.sanitize(playerName);
+		
+		if (!checkURL(url))
+		{
+			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The URL for Spectral's Web App is either missing or not valid. Contact the developer about this issue.", null));
+			return false;
+		}
+		else
+		{
+			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncAccessKey("get-key", player)
+			.thenApply(result ->
+			{
+				if (!result.equalsIgnoreCase("success"))
+				{
+					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Something went wrong and the command could not be completed. Contact the developer about this issue.", null));
+					return false;
+				}
+				else
+				{
+					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Your access key was set.", null));
+				}
+				
+				return true;
+			});
+			
+			return future.join();
+		}
+	}
+	
+	protected String setAccessKey(Response response) throws IOException
+	{
+		if (!response.isSuccessful())
+		{
+			throw new IOException("Error occurred: " + response);
+		}
+		
+		JsonObject resp;
+		String stat = "";
+		String dat = "";
+		
+		try
+		{
+			resp = gson.fromJson(response.body().charStream(), JsonObject.class);
+		}
+		catch (JsonSyntaxException ex)
+		{
+			throw new IOException("Error occurred when attempting to deserialize the response body.", ex);
+		}
+		
+		if (resp == null)
+		{
+			validAccessKey = false;
+			return "failure";
+		}
+		
+		stat = resp.get("status").getAsString();
+		dat = resp.get("data").getAsString();
+		
+		if (stat.equalsIgnoreCase("success"))
+		{
+			if (!dat.equals(""))
+			{
+				config.setMemberKey(dat);
+			}
+			else
+			{
+				config.setMemberKey("");
+			}
+		}
+		else
+		{
+			config.setMemberKey("");
+		}
 		
 		return stat;
 	}
