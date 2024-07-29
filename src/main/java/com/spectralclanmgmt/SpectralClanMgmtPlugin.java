@@ -350,7 +350,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 					commandProcessing = true;
 					final String player = Text.sanitize(client.getLocalPlayer().getName());
 					final int rank = getLocalPlayerRank(Optional.empty());
-					executor = Executors.newSingleThreadScheduledExecutor();
 					
 					executor.execute(() ->
 					{
@@ -363,8 +362,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 							return;
 						}
 					});
-					
-					executor.shutdown();
 				}
 				else if (commandProcessing && !config.memberKey().equals("") && !pluginLoaded && attemptCount < 5)
 				{
@@ -526,8 +523,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 				String player = Text.sanitize(spectralCommand.getPlayer());
 				int rank = spectralCommand.getRank();
 				
-				executor = Executors.newSingleThreadScheduledExecutor();
-				
 				executor.execute(() ->
 				{
 					try
@@ -568,13 +563,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 						return;
 					}
 				});
-				
-				executor.shutdown();
 			}
 			else
 			{
-				executor = Executors.newSingleThreadScheduledExecutor();
-				
 				executor.execute(() ->
 				{
 					try
@@ -613,14 +604,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 						return;
 					}
 				});
-				
-				executor.shutdown();
 			}
 		}
 		else
 		{
-			executor = Executors.newSingleThreadScheduledExecutor();
-			
 			executor.execute(() ->
 			{
 				try
@@ -645,8 +632,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 					return;
 				}
 			});
-			
-			executor.shutdown();
 		}
 	}
 	
