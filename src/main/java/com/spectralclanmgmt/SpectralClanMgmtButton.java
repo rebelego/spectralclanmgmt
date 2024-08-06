@@ -629,17 +629,15 @@ public class SpectralClanMgmtButton
 		
 		if (task.equals("add-new"))
 		{
-			String localPlayerName = client.getLocalPlayer().getName();
-			
 			chatboxPanelManager
 			.openTextMenuInput("You have selected '" + firstMemberName + "'. Is this correct?<br>Click Yes to export the data, No to select again, or Cancel to exit.")
-			.option("Yes", () -> exportChange(task, firstMemberDate, firstMemberName, localPlayerName))
+			.option("Yes", () -> exportChange(task, firstMemberDate, firstMemberName, ""))
 			.option("No", () -> selectNew())
 			.option("Cancel", () -> removeListeners())
 			.build(2);
 		}
 		else if (task.equals("add-alt-get-new"))
-	{
+		{
 			chatboxPanelManager
 			.openTextMenuInput("You've selected '" + firstMemberName + "' as the Alt. Is this correct?<br>Click Yes to proceed, No to select again, or Cancel to exit.")
 			.option("Yes", () -> selectMain())
@@ -680,7 +678,7 @@ public class SpectralClanMgmtButton
 			
 			chatboxPanelManager
 			.openTextMenuInput(option + "Click Yes to export the change, No to start over, or Cancel to exit.")
-			.option("Yes", () -> exportChange(task, firstMemberName, "", category))
+			.option("Yes", () -> exportChange(task, firstMemberName, category, ""))
 			.option("No", () -> selectRevokePermission(""))
 			.option("Cancel", () -> removeListeners())
 			.build(2);
@@ -700,7 +698,7 @@ public class SpectralClanMgmtButton
 			
 			chatboxPanelManager
 			.openTextMenuInput(option + "Click Yes to export the change, No to start over, or Cancel to exit.")
-			.option("Yes", () -> exportChange(task, firstMemberName, "", category))
+			.option("Yes", () -> exportChange(task, firstMemberName, category, ""))
 			.option("No", () -> selectRestorePermission(""))
 			.option("Cancel", () -> removeListeners())
 			.build(2);
@@ -836,6 +834,7 @@ public class SpectralClanMgmtButton
 				String fArg = "";
 				String sArg = "";
 				String tArg = "";
+				String admin = Text.sanitize(client.getLocalPlayer().getName());
 				
 				// Before we proceed, we'll check that the script's URL is set and valid.
 				if (plugin.checkURL(plugin.getAdminURL()))
@@ -844,11 +843,10 @@ public class SpectralClanMgmtButton
 					{
 						// firstArg = newMemberDate
 						// secondArg = newMemberName
-						// thirdArg = localPlayerName
+						// thirdArg = blank
 						fArg = firstArg;
 						String tempPlayerName = secondArg;
 						sArg = Text.sanitize(tempPlayerName);
-						tArg = Text.sanitize(thirdArg);
 					}
 					else if (task.equals("add-alt"))
 					{
@@ -875,8 +873,8 @@ public class SpectralClanMgmtButton
 					else if (task.equals("revoke-permission") || task.equals("restore-permission"))
 					{
 						// firstArg = selected member's name
-						// secondArg = blank
-						// thirdArg = permission selection
+						// secondArg = permission selection
+						// thirdArg = blank
 						String tempPlayerName = firstArg;
 						fArg = Text.sanitize(tempPlayerName);
 						sArg = secondArg;
@@ -885,7 +883,7 @@ public class SpectralClanMgmtButton
 					
 					httpRequest.setIsReady(false);
 					
-					httpRequest.postRequestAsyncAdmin(task, fArg, sArg, tArg).whenCompleteAsync((result, ex) ->
+					httpRequest.postRequestAsyncAdmin(task, fArg, sArg, tArg, admin).whenCompleteAsync((result, ex) ->
 					{
 						httpRequest.setIsReady(true);
 						removeListeners();

@@ -96,7 +96,7 @@ public class SpectralClanMgmtHttpRequest
 	/* 
 	This is for the Admin-related export tasks in the SpectralClanMgmtButton class (new member additions and name changes).
 	 */
-	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg)
+	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg, String adminPlayer)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
@@ -104,12 +104,12 @@ public class SpectralClanMgmtHttpRequest
 		String arg2 = "";
 		String arg3 = "";
 		String arg4 = "";
+		String arg5 = "adminPlayer";
 		
 		if (task.equalsIgnoreCase("add-new"))
 		{
 			arg2 = "joinDate";
 			arg3 = "mainPlayer";
-			arg4 = "adminPlayer";
 		}
 		else if (task.equalsIgnoreCase("add-alt"))
 		{
@@ -143,13 +143,13 @@ public class SpectralClanMgmtHttpRequest
 		
 		String payload = "";
 		
-		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
+		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission") || task.equalsIgnoreCase("add-new"))
 		{
-			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + thirdArg + "\"}";
+			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"accessKey\":\"" + config.memberKey() + "\"}";
 		}
 		else
 		{
-			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\"}";
+			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"accessKey\":\"" + config.memberKey() + "\"}";
 		}
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
@@ -173,7 +173,7 @@ public class SpectralClanMgmtHttpRequest
 			{
 				if (!response.isSuccessful())
 				{
-					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+					respBody.completeExceptionally(new IOException("Something went wrong. Report this issue with this response code to the developer: " + response.toString()));
 				}
 				else
 				{
