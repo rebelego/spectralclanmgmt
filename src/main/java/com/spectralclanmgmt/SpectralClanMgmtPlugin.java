@@ -89,11 +89,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private ClanSettings clanSettings;
 	
-	private List<ClanMember> clanMembers;
-	
-	private HashMap<Integer, String> members = new HashMap<Integer, String>();
-	
-	private HashMap<String, String> memberJoinDates = new HashMap<String, String>();
+	private HashMap<Integer, ClanMember> sortedClanMembers = new HashMap<Integer, ClanMember>();
 	
 	private static final int CLAN_SETTINGS_INTERFACE = 690;
 	
@@ -152,11 +148,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	protected GameState gameState;
 	
+	private final String COMMAND_KEY = "!key";
+	
 	private final String COMMAND_SPECTRAL = "!spectral";
 	
 	private final String COMMAND_MOD = "!mod";
-	
-	private final String COMMAND_KEY = "!key";
 	
 	private final String COMMAND_RECRUIT = "!recruit";
 	
@@ -348,14 +344,25 @@ public class SpectralClanMgmtPlugin extends Plugin
 				if (!commandProcessing && !pluginLoaded && !config.memberKey().equals("") && attemptCount < 5)
 				{
 					commandProcessing = true;
-					final String player = Text.sanitize(client.getLocalPlayer().getName());
-					final int rank = getLocalPlayerRank(Optional.empty());
+					final String player = client.getLocalPlayer().getName();
+					int playerRank = 0;
+					ClanSettings clan = client.getClanSettings();
+					
+					if (clan != null && clan.getName().equals("Spectral"))
+					{
+						if (clan.findMember(player) != null)
+						{
+							playerRank = clan.titleForRank(clan.findMember(player).getRank()).getId();
+						}
+					}
+					
+					final int rank = playerRank;
 					
 					executor.execute(() ->
 					{
 						try
 						{
-							getPluginData(rank, player, "onGameTick");
+							getPluginData(rank, Text.sanitize(player), "onGameTick");
 						}
 						catch (Exception e)
 						{
@@ -460,7 +467,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 				// All credit for the original code goes to dekvall.
 				clientThread.invoke(() ->
 				{
-					createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, members, memberJoinDates);
+					createClanMemberButton(CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER, sortedClanMembers);
 					
 					if (spectralClanMemberButton.isButtonCreated())
 					{
@@ -471,13 +478,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			else
 			{
-				if (clanMembers != null)
-				{
-					clanMembers.clear();
-				}
-				
-				members.clear();
-				memberJoinDates.clear();
+				sortedClanMembers.clear();
 			}
 		}
 	}
@@ -488,19 +489,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 		// If the Members List widget is closed, reset everything (just in case).
 		if (widget.getGroupId() == CLAN_SETTINGS_MEMBERS_INTERFACE)
 		{
-			if (clanMembers != null)
-			{
-				clanMembers.clear();
-			}
-			
 			if (getLocalPlayerRank(Optional.empty()) == 0)
 			{
 				adminURL = "";
 				discordURL = "";
 			}
 			
-			members.clear();
-			memberJoinDates.clear();
+			sortedClanMembers.clear();
 			
 			// This is being set so that whenever a request is posted, if the members list UI isn't open when the response is received,
 			// the HttpRequest class will route the results to the exportDone method in this class instead of the clan mgmt button's class.
@@ -933,17 +928,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 			{
 				if (checkURL(adminURL))
 				{
-					if (members != null)
+					if (sortedClanMembers != null)
 					{
-						if (members.size() > 0)
+						if (sortedClanMembers.size() > 0)
 						{
-							if (memberJoinDates != null)
-							{
-								if (memberJoinDates.size() > 0 && memberJoinDates.size() == members.size())
-								{
-									return true;
-								}
-							}
+							return true;
 						}
 					}
 				}
@@ -976,12 +965,16 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			if (attemptCount >= 5)
 			{
-				return "attempt-fail";
+				return "attempt-fail;The plugin has made the max allowed attempts to retrieve its data.";
 			}
 			
-			if (rank == 0 || (!isNormalRank(rank) && !isAdminRank(rank)) || !checkURL(config.scriptURL()) || config.memberKey().equals(""))
+			if (rank == 0 || (!isNormalRank(rank) && !isAdminRank(rank)) || !checkURL(config.scriptURL()))
 			{
-				return "perma-fail";
+				return "perma-fail;You don't have permission to use this plugin.";
+			}
+			else if (config.memberKey().equals(""))
+			{
+				return "perma-fail;Your access key is not set. If you're a ranked member of Spectral, use the !key command to get your access key. If the issue persists, contact the developer.";
 			}
 			
 			if (isNormalRank(rank))
@@ -1008,7 +1001,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 		})
 		.thenApplyAsync(res ->
 		{
-			if (res.equalsIgnoreCase("perma-fail"))
+			String[] result = res.split("\\;");
+			
+			if (result[0].equalsIgnoreCase("perma-fail"))
 			{
 				adminURL = "";
 				discordURL = "";
@@ -1025,12 +1020,18 @@ public class SpectralClanMgmtPlugin extends Plugin
 				attemptCount = 5;
 				ready = true;
 			}
-			else if (res.equalsIgnoreCase("attempt-fail"))
+			else if (result[0].equalsIgnoreCase("attempt-fail"))
 			{
 				pluginLoaded = true;
 				ready = true;
 			}
-			else if (res.equalsIgnoreCase("failure"))
+			else if (result[0].equalsIgnoreCase("failure"))
+			{
+				attemptCount = 5;
+				pluginLoaded = true;
+				ready = true;
+			}
+			else if (result[0].equalsIgnoreCase("resp-failure"))
 			{
 				attemptCount++;
 				
@@ -1046,7 +1047,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 					ready = true;
 				}
 			}
-			else if (res.equalsIgnoreCase("success"))
+			else if (result[0].equalsIgnoreCase("success"))
 			{
 				attemptCount = 0;
 				pluginLoaded = true;
@@ -1056,12 +1057,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 			if (src.equalsIgnoreCase("onGameTick"))
 			{
 				commandProcessing = false;
+				clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", result[1], null));
 			}
-			else if (src.equalsIgnoreCase("!spectral") && res.equalsIgnoreCase("success"))
+			else if (src.equalsIgnoreCase("!spectral") && result[0].equalsIgnoreCase("success"))
 			{
 				return canUseSpectralCommand;
 			}
-			else if ((src.equalsIgnoreCase("!mod") || src.equalsIgnoreCase("!recruit")) && res.equalsIgnoreCase("success"))
+			else if ((src.equalsIgnoreCase("!mod") || src.equalsIgnoreCase("!recruit")) && result[0].equalsIgnoreCase("success"))
 			{
 				return canUseDiscordCommands;
 			}
@@ -1080,7 +1082,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (!response.isSuccessful())
 		{
-			throw new IOException("Error occurred: " + response);
+			throw new IOException("An error occurred: " + response);
 		}
 		
 		JsonObject resp;
@@ -1093,48 +1095,49 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		catch (JsonSyntaxException ex)
 		{
-			throw new IOException("Error occurred when attempting to deserialize the response body.", ex);
+			throw new IOException("An error occurred when attempting to deserialize the response body.", ex);
 		}
 		
 		if (resp == null)
 		{
-			return "failure";
+			validAccessKey = false;
+			canUseSpectralCommand = false;
+			canUseDiscordCommands = false;
+			discordURL = "";
+			adminURL = "";
+			
+			return "resp-failure;Something went wrong and the plugin's data could not be retrieved. Contact the developer about this issue.";
 		}
 		
 		stat = resp.get("status").getAsString();
-		
-		if (stat.equalsIgnoreCase("failure"))
-		{
-			return "failure";
-		}
-		
 		JsonArray permission = resp.get("permission").getAsJsonArray();
 		int permissionTime = resp.get("permissionTime").getAsInt();
 		int downTime = resp.get("downTime").getAsInt();
-		String phraseList = resp.get("phrases").getAsString();
-		JsonArray conLink = resp.get("configLink").getAsJsonArray();
-		String[] links = new String[conLink.size()];
-		
-		if (conLink.size() == 1)
-		{
-			links[0] = String.valueOf(conLink.get(0));
-			adminURL = "";
-			discordURL = links[0].substring(1, links[0].length() - 1);
-		}
-		else if (conLink.size() == 2)
-		{
-			links[0] = String.valueOf(conLink.get(0));
-			links[1] = String.valueOf(conLink.get(1));
-			discordURL = links[0].substring(1, links[0].length() - 1);
-			adminURL = links[1].substring(1, links[1].length() - 1);
-		}
 		
 		validAccessKey = permission.get(0).getAsBoolean();
-		canUseSpectralCommand = permission.get(1).getAsBoolean();
-		canUseDiscordCommands = permission.get(2).getAsBoolean();
 		
 		if (validAccessKey)
 		{
+			canUseSpectralCommand = permission.get(1).getAsBoolean();
+			canUseDiscordCommands = permission.get(2).getAsBoolean();
+			String phraseList = resp.get("phrases").getAsString();
+			JsonArray conLink = resp.get("configLink").getAsJsonArray();
+			String[] links = new String[conLink.size()];
+			
+			if (conLink.size() == 1)
+			{
+				links[0] = String.valueOf(conLink.get(0));
+				adminURL = "";
+				discordURL = links[0].substring(1, links[0].length() - 1);
+			}
+			else if (conLink.size() == 2)
+			{
+				links[0] = String.valueOf(conLink.get(0));
+				links[1] = String.valueOf(conLink.get(1));
+				discordURL = links[0].substring(1, links[0].length() - 1);
+				adminURL = links[1].substring(1, links[1].length() - 1);
+			}
+			
 			if (phraseList.trim() != "")
 			{
 				String[] phrases = phraseList.split("\\;");
@@ -1149,13 +1152,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 					spectralPhrases.setPhrases(phrases);
 				}
 			}
-			else
-			{
-				if (spectralPhrases != null)
-				{
-					spectralPhrases.setPhrases(null);
-				}
-			}
 		}
 		else
 		{
@@ -1163,11 +1159,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			canUseDiscordCommands = false;
 			discordURL = "";
 			adminURL = "";
-			
-			if (spectralPhrases != null)
-			{
-				spectralPhrases.setPhrases(null);
-			}
 		}
 		
 		if (permissionTime > 0)
@@ -1182,7 +1173,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		permissionCheckTimer = 0;
 		
-		return "success";
+		if (stat.equalsIgnoreCase("failure"))
+		{
+			String reason = resp.get("reason").getAsString();
+			return stat + ";" + reason;
+		}
+		
+		return "success;The plugin's data was successfully retrieved and set.";
 	}
 	
 	// Clears and populates the members and membersJoinDates hashmaps with sorted values.
@@ -1191,66 +1188,33 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		clanSettings = client.getClanSettings();
 		
-		if (clanMembers != null)
-		{
-			clanMembers.clear();
-		}
-		
 		// We clear and set these every time this is run, because it's only called when the members list UI is loaded.
-		members.clear();
-		memberJoinDates.clear();
+		sortedClanMembers.clear();
 		
 		if (clanSettings != null)
 		{
-			clanMembers = clanSettings.getMembers();
+			List<ClanMember> clanMembers = clanSettings.getMembers();
 			
-			// We get the members names into a temp arraylist, so they can be sorted next.
-			ArrayList<String> mems = new ArrayList<String>();
-			
-			clanMembers.forEach((me) -> mems.add(me.getName()));
-			
-			// This sorts the arraylist of member names alphabetically while ignoring the letter cases.
-			Collections.sort(mems, String.CASE_INSENSITIVE_ORDER);
+			Collections.sort(clanMembers, (m1, m2) -> m1.getName().compareToIgnoreCase(m2.getName()));
 			
 			int i = 0;
 			
-			for (String m : mems)
-			{
-				// Now that we've got a sorted list of member names, we'll put them into a hashmap, 
-				// using i to act as an index for the member names. This will be used later in the button's class 
-				// to match the name the player the user clicked on in the UI to the name in this hashmap 
-				// so we won't have to deal with the annoyance of getting the text from a widget and sanitizing it.
-				members.put(i, m);
-				i++;
-			}
-			
-			// Finally, we get the converted join date set for the EST/EDT timezone for each member
-			// and add it to the memberJoinDates hashmap. The member's name is the key and the join date is its value.
+			// Now that we've got a sorted list of member names, we'll put them into a hashmap, 
+			// using i to act as an index for the members. This will be used later in the button's class.
 			for (ClanMember cm : clanMembers)
 			{
-				String joinDate = convertJoinDate(cm);
-				memberJoinDates.put(cm.getName(), joinDate);
+				sortedClanMembers.put(i, cm);
+				i++;
 			}
 		}
-	}
-	
-	// We need to convert each member's LocalDate type joinDate value from the ClanMember class into the correct number of epoch seconds.
-	// To do this, we get the epoch seconds of the LocalDate value, then multiply that number by 1000.
-	// With the new total epoch seconds, we'll get the right date when we convert it to a date value for the specified time zone.
-	private String convertJoinDate(ClanMember member)
-	{
-		long joined = member.getJoinDate().atStartOfDay(ZoneId.of("Europe/Belfast")).toEpochSecond() * 1000L;
-		ZonedDateTime convertedJoinDate = Instant.ofEpochMilli(joined).atZone(ZoneId.of("America/New_York"));
-		String spectralJoinDate = convertedJoinDate.format(DateTimeFormatter.ofPattern("M/d/uuuu"));
-		return spectralJoinDate;
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin code and rewritten to fit this plugin's usage. 
 	// All credit for the original code goes to dekvall.
-	private void createClanMemberButton(int w, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates)
+	private void createClanMemberButton(int w, HashMap<Integer, ClanMember> clanmembers)
 	{
 		ClanSettings clanSettings = client.getClanSettings(0);
-		spectralClanMemberButton.createButton(w, clanmembers, clanmemberJoinDates, clanSettings);
+		spectralClanMemberButton.createButton(w, clanmembers, clanSettings);
 	}
 	// **
 	
@@ -1358,14 +1322,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 		boolean flag = false;
 		String msg = "";
 		
-		if (!perm)
+		if (!perm || config.memberKey().equals("") || !validAccessKey)
 		{
 			msg = "You aren't allowed to use this plugin's commands. Contact the developer if you're a ranked member of the Spectral clan and you see this message.";
 			flag = true;
 		}
 		else if (spectralPhrases == null || (spectralPhrases != null && spectralPhrases.getPhrases() == null) || (spectralPhrases != null && spectralPhrases.getPhrases() != null && spectralPhrases.getPhrases().length == 0))
 		{
-			msg = "Something went wrong. No phrases found for command. Contact the plugin dev about this issue.";
+			msg = "No phrases found for the command. Contact the developer about this issue.";
 			flag = true;
 		}
 		
@@ -1405,7 +1369,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			msg = "The URL for Spectral's Discord Web App is either missing or not valid. Contact the developer about this issue.";
 			flag = true;
 		}
-		else if (!perm)
+		else if (!perm || config.memberKey().equals("") || !validAccessKey)
 		{
 			msg = "You aren't allowed to use this plugin's commands. Contact the developer if you're a ranked member of the Spectral clan and you see this message.";
 			flag = true;
@@ -1422,9 +1386,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncRecruitMod("discord", spectralCommand.getSpectralCommand(), player)
 			.thenApply(result ->
 			{
-				if (!result.equalsIgnoreCase("success"))
+				String[] results = result.split("\\;");
+				
+				if (!results[0].equalsIgnoreCase("success"))
 				{
-					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Something went wrong and the command could not be completed. Contact the developer about this issue.", null));
+					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", results[1], null));
 					return false;
 				}
 				
@@ -1440,11 +1406,12 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (!response.isSuccessful())
 		{
-			throw new IOException("Error occurred: " + response);
+			throw new IOException("An error occurred: " + response);
 		}
 		
 		JsonObject resp;
 		String stat = "";
+		String dat = "";
 		
 		try
 		{
@@ -1452,17 +1419,21 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		catch (JsonSyntaxException ex)
 		{
-			throw new IOException("Error occurred when attempting to deserialize the response body.", ex);
+			throw new IOException("An error occurred when attempting to deserialize the response body.", ex);
 		}
 		
 		if (resp == null)
 		{
-			return "failure";
+			stat = "failure";
+			dat = "Something went wrong and the command could not be completed. Contact the developer about this issue.";
+		}
+		else
+		{
+			stat = resp.get("status").getAsString();
+			dat = resp.get("data").getAsString();
 		}
 		
-		stat = resp.get("status").getAsString();
-		
-		return stat;
+		return stat + ";" + dat;
 	}
 	
 	private Boolean getAccessKey(String playerName, String url)
@@ -1479,14 +1450,13 @@ public class SpectralClanMgmtPlugin extends Plugin
 			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncAccessKey("get-key", player)
 			.thenApply(result ->
 			{
-				if (!result.equalsIgnoreCase("success"))
+				String[] results = result.split("\\;");
+				
+				clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", results[1], null));
+				
+				if (!results[0].equalsIgnoreCase("success"))
 				{
-					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Something went wrong and the command could not be completed. Contact the developer about this issue.", null));
 					return false;
-				}
-				else
-				{
-					clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Your access key was set.", null));
 				}
 				
 				return true;
@@ -1500,7 +1470,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (!response.isSuccessful())
 		{
-			throw new IOException("Error occurred: " + response);
+			throw new IOException("An error occurred: " + response);
 		}
 		
 		JsonObject resp;
@@ -1513,34 +1483,45 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		catch (JsonSyntaxException ex)
 		{
-			throw new IOException("Error occurred when attempting to deserialize the response body.", ex);
+			throw new IOException("An error occurred when attempting to deserialize the response body.", ex);
 		}
 		
 		if (resp == null)
 		{
 			validAccessKey = false;
-			return "failure";
+			stat = "failure";
+			dat = "Something went wrong and your access key could not be found. Contact the developer about this issue.";
+		}
+		else
+		{
+			stat = resp.get("status").getAsString();
+			dat = resp.get("data").getAsString();
 		}
 		
-		stat = resp.get("status").getAsString();
-		dat = resp.get("data").getAsString();
+		String result = "";
 		
 		if (stat.equalsIgnoreCase("success"))
 		{
 			if (!dat.equals(""))
 			{
 				config.setMemberKey(dat);
+				validAccessKey = true;
+				result = stat + ";Your access key was set.";
 			}
 			else
 			{
+				validAccessKey = false;
 				config.setMemberKey("");
+				result = stat + ";Something went wrong during the access key request. If you're a ranked member of Spectral, contact the developer about this issue.";
 			}
 		}
 		else
 		{
+			result = stat + ";" + dat;
+			validAccessKey = false;
 			config.setMemberKey("");
 		}
 		
-		return stat;
+		return result;
 	}
 }

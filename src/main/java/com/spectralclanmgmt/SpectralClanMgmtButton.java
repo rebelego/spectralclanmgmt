@@ -3,6 +3,7 @@ package com.spectralclanmgmt;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import net.runelite.api.clan.ClanMember;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.*;
 import net.runelite.api.widgets.*;
@@ -10,6 +11,10 @@ import net.runelite.client.util.Text;
 import okhttp3.Response;
 import javax.inject.Inject;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,8 +43,7 @@ public class SpectralClanMgmtButton
 	private int adminRank = 0;
 	private final List<Widget> cornersAndEdges = new ArrayList<>();
 	private Widget textWidget;
-	private HashMap<Integer, String> clanmembers = new HashMap<Integer, String>();
-	private HashMap<String, String> clanmemberJoinDates = new HashMap<String, String>();
+	private HashMap<Integer, ClanMember> clanmembers = new HashMap<Integer, ClanMember>();
 	private boolean buttonCreated;
 	
 	@Inject
@@ -61,10 +65,9 @@ public class SpectralClanMgmtButton
 		this.httpRequest.setButton(this);
 	}
 	
-	public void createButton(int parent, HashMap<Integer, String> clanmembers, HashMap<String, String> clanmemberJoinDates, ClanSettings clanSettings)
+	public void createButton(int parent, HashMap<Integer, ClanMember> clanmembers, ClanSettings clanSettings)
 	{
 		this.clanmembers = clanmembers;
-		this.clanmemberJoinDates = clanmemberJoinDates;
 		this.clanSettings = clanSettings;
 		this.parent = client.getWidget(parent);
 		
@@ -134,6 +137,7 @@ public class SpectralClanMgmtButton
 		wasClicked = false;
 		this.textWidget = null;
 		this.buttonCreated = false;
+		clanmembers.clear();
 	}
 	
 	protected boolean isButtonCreated()
@@ -166,6 +170,17 @@ public class SpectralClanMgmtButton
 	}
 	// **
 	
+	// We need to convert the member's LocalDate type joinDate value from the ClanMember class into the correct number of epoch seconds.
+	// To do this, we get the epoch seconds of the LocalDate value, then multiply that number by 1000.
+	// With the new total epoch seconds, we'll get the right date when we convert it to a date value for the specified time zone.
+	private String convertJoinDate(ClanMember member)
+	{
+		long joined = member.getJoinDate().atStartOfDay(ZoneId.of("Europe/Belfast")).toEpochSecond() * 1000L;
+		ZonedDateTime convertedJoinDate = Instant.ofEpochMilli(joined).atZone(ZoneId.of("America/New_York"));
+		String spectralJoinDate = convertedJoinDate.format(DateTimeFormatter.ofPattern("M/d/uuuu"));
+		return spectralJoinDate;
+	}
+	
 	// The method for the click listeners on the member names child widgets of the member names column.
 	// Depending on the option the user first selected, different methods will be run.
 	// The user can either select a new main or a new alt (along with the new alt's main in the clan), or a member for a name chang export.
@@ -188,36 +203,35 @@ public class SpectralClanMgmtButton
 				{
 					if (clanmembers.size() > 0)
 					{
-						if (clanmemberJoinDates != null)
+						// With the slot number, we get the selected member's name, 
+						// and with the member's name we get their join date and store it in these variables for later.
+						ClanMember selectedNewMember = clanmembers.get(sn);
+						String selectedNewMemberDate = "";
+						
+						if (selectedNewMember != null)
 						{
-							if (clanmemberJoinDates.size() > 0)
+							selectedNewMemberDate = convertJoinDate(selectedNewMember);
+						}
+						
+						if (selectedNewMember != null && !selectedNewMemberDate.equals(""))
+						{
+							int memberRank = clanSettings.titleForRank(selectedNewMember.getRank()).getId();
+							
+							if (memberRank == 9 || memberRank == -1) // 9 is for the Alt rank. -1 is for the Guest rank. Mains can't have either of these ranks.
 							{
-								// With the slot number, we get the selected member's name, 
-								// and with the member's name we get their join date and store it in these variables for later.
-								String selectedNewMemberName = clanmembers.get(sn);
-								String selectedNewMemberDate = clanmemberJoinDates.get(selectedNewMemberName);
-								
-								if (!selectedNewMemberName.equals("") && !selectedNewMemberDate.equals(""))
-								{
-									int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
-									
-									if (memberRank == 9 || memberRank == -1) // 9 is for the Alt rank. -1 is for the Guest rank. Mains can't have either of these ranks.
-									{
-										// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
-										task = "invalid-new";
-										firstMemberName = selectedNewMemberName;
-									}
-									else if (memberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(memberRank) || SpectralClanMgmtPlugin.isAdminRank(memberRank)))
-									{
-										// Flip the flag and set the local variable values to their corresponding global variables.
-										firstMemberSelected = true;
-										firstMemberName = selectedNewMemberName;
-										firstMemberDate = selectedNewMemberDate;
-										// Proceed to the next step.
-										confirmSelection();
-										return;
-									}
-								}
+								// This occurs if the admin selected a member that has the rank for Alt accounts, which is a no-no for mains.
+								task = "invalid-new";
+								firstMemberName = selectedNewMember.getName();
+							}
+							else if (memberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(memberRank) || SpectralClanMgmtPlugin.isAdminRank(memberRank)))
+							{
+								// Flip the flag and set the local variable values to their corresponding global variables.
+								firstMemberSelected = true;
+								firstMemberName = selectedNewMember.getName();
+								firstMemberDate = selectedNewMemberDate;
+								// Proceed to the next step.
+								confirmSelection();
+								return;
 							}
 						}
 					}
@@ -257,34 +271,33 @@ public class SpectralClanMgmtButton
 				{
 					if (clanmembers.size() > 0)
 					{
-						if (clanmemberJoinDates != null)
+						// With the slot number, we get the selected member's name, 
+						// and with the member's name we get their join date and store it in these variables for later.
+						ClanMember selectedNewMember = clanmembers.get(sn);
+						String selectedNewMemberDate = "";
+						
+						if (selectedNewMember != null)
 						{
-							if (clanmemberJoinDates.size() > 0)
+							selectedNewMemberDate = convertJoinDate(selectedNewMember);
+						}
+						
+						if (selectedNewMember != null && !selectedNewMemberDate.equals(""))
+						{
+							int memberRank = clanSettings.titleForRank(selectedNewMember.getRank()).getId();
+							
+							// Check that the selected member has the required rank for Alts. 9 is the ID for the Alt rank's title.
+							if (memberRank == 9)
 							{
-								// With the slot number, we get the selected member's name, 
-								// and with the member's name we get their join date and store it in these variables for later.
-								String selectedNewMemberName = clanmembers.get(sn);
-								String selectedNewMemberDate = clanmemberJoinDates.get(selectedNewMemberName);
-								
-								if (selectedNewMemberName != "" && selectedNewMemberDate != "")
-								{
-									int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedNewMemberName).getRank()).getId();
-									
-									// Check that the selected member has the required rank for Alts. 9 is the ID for the Alt rank's title.
-									if (memberRank == 9)
-									{
-										firstMemberSelected = true;
-										firstMemberName = selectedNewMemberName;
-										firstMemberDate = selectedNewMemberDate;
-										confirmSelection();
-										return;
-									}
-									else
-									{
-										task = "invalid-alt";
-										firstMemberName = selectedNewMemberName;
-									}
-								}
+								firstMemberSelected = true;
+								firstMemberName = selectedNewMember.getName();
+								firstMemberDate = selectedNewMemberDate;
+								confirmSelection();
+								return;
+							}
+							else
+							{
+								task = "invalid-alt";
+								firstMemberName = selectedNewMember.getName();
 							}
 						}
 					}
@@ -327,23 +340,23 @@ public class SpectralClanMgmtButton
 					if (clanmembers.size() > 0)
 					{
 						// For the Alt's Main, we only need its name.
-						String selectedMainMemberName = clanmembers.get(sn);
+						ClanMember selectedMainMember = clanmembers.get(sn);
 						
-						if (!selectedMainMemberName.equals(""))
+						if (selectedMainMember != null)
 						{
-							int mainMemberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMainMemberName).getRank()).getId();
+							int mainMemberRank = clanSettings.titleForRank(selectedMainMember.getRank()).getId();
 							
 							// Check that the selected member has one of the ranks for Mains.
 							if (mainMemberRank == 9 || mainMemberRank == -1) // 9 is the ID for the Alt rank's title. -1 is the Guest rank's title. Mains can't have either of those ranks.
 							{
 								task = "invalid-main";
-								secondMemberName = selectedMainMemberName;
+								secondMemberName = selectedMainMember.getName();
 							}
 							else if (mainMemberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(mainMemberRank) || SpectralClanMgmtPlugin.isAdminRank(mainMemberRank)))
 							{ // Have to include the check for Alt rank in the check here as well since it's a normal rank, but Mains can't have it.
 								task = "add-alt";
 								secondMemberSelected = true;
-								secondMemberName = selectedMainMemberName;
+								secondMemberName = selectedMainMember.getName();
 								// Proceed to the next step.
 								confirmSelection();
 								return;
@@ -387,66 +400,75 @@ public class SpectralClanMgmtButton
 					if (clanmembers.size() > 0)
 					{
 						// For selecting a name change, we only want to get the current name and store it in a local variable.
-						String selectedChangedMember = clanmembers.get(sn);
+						ClanMember selectedChangedMember = clanmembers.get(sn);
 						
-						if (!selectedChangedMember.equals(""))
+						if (selectedChangedMember != null)
 						{
-							int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedChangedMember).getRank()).getId();
+							String adminMember = client.getLocalPlayer().getName();
 							
-							if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
+							if (!adminMember.equalsIgnoreCase(selectedChangedMember.getName()))
 							{
-								category = "";
-							}
-							else if (memberRank == 9)
-							{
-								category = "alt";
-							}
-							else if (SpectralClanMgmtPlugin.isNormalRank(memberRank))
-							{
-								category = "main";
-							}
-							else if (SpectralClanMgmtPlugin.isAdminRank(memberRank)) // Admins
-							{
-								// Since admin members usually have the same rank for all their accts, the member type could be main or alt.
-								category = "both";
-							}
-							
-							if (!category.equals(""))
-							{
-								// Check if there's at least one friend on the admin's Friends list.
-								if (client.getFriendContainer().getCount() > 0)
+								int memberRank = clanSettings.titleForRank(selectedChangedMember.getRank()).getId();
+								
+								if (memberRank == -1) // This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
 								{
-									Friend changedMember = client.getFriendContainer().findByName(selectedChangedMember);
-									
-									// Check if the selected member is on the admin's Friends list.
-									if (changedMember != null)
+									category = "";
+								}
+								else if (memberRank == 9)
+								{
+									category = "alt";
+								}
+								else if (SpectralClanMgmtPlugin.isNormalRank(memberRank))
+								{
+									category = "main";
+								}
+								else if (SpectralClanMgmtPlugin.isAdminRank(memberRank)) // Admins
+								{
+									// Since admin members usually have the same rank for all their accts, the member type could be main or alt.
+									category = "both";
+								}
+								
+								if (!category.equals(""))
+								{
+									// Check if there's at least one friend on the admin's Friends list.
+									if (client.getFriendContainer().getCount() > 0)
 									{
-										// Check if the member has changed their name before.
-										if (changedMember.getPrevName() != null && !changedMember.getPrevName().equals(""))
+										Friend changedMember = client.getFriendContainer().findByName(selectedChangedMember.getName());
+										
+										// Check if the selected member is on the admin's Friends list.
+										if (changedMember != null)
 										{
-											firstMemberSelected = true;
-											firstMemberName = selectedChangedMember;
-											secondMemberName = changedMember.getPrevName();
-											// Proceed to the next step.
-											confirmSelection();
-											return;
+											// Check if the member has changed their name before.
+											if (changedMember.getPrevName() != null && !changedMember.getPrevName().equals(""))
+											{
+												firstMemberSelected = true;
+												firstMemberName = selectedChangedMember.getName();
+												secondMemberName = changedMember.getPrevName();
+												// Proceed to the next step.
+												confirmSelection();
+												return;
+											}
+											else // The member hasn't changed their name before.
+											{
+												task = "no-name-change";
+												firstMemberName = selectedChangedMember.getName();
+											}
 										}
-										else // The member hasn't changed their name before.
+										else // The member isn't on the admin's Friends list.
 										{
-											task = "no-name-change";
-											firstMemberName = selectedChangedMember;
+											task = "not-friend";
+											firstMemberName = selectedChangedMember.getName();
 										}
 									}
-									else // The member isn't on the admin's Friends list.
+									else // The admin's Friends list is empty.
 									{
-										task = "not-friend";
-										firstMemberName = selectedChangedMember;
+										task = "no-friends";
 									}
 								}
-								else // The admin's Friends list is empty.
-								{
-									task = "no-friends";
-								}
+							}
+							else // You can't submit a name change for yourself, because you can't add yourself to your Friends list.
+							{
+								task = "same-person";
 							}
 						}
 					}
@@ -461,7 +483,7 @@ public class SpectralClanMgmtButton
 				
 				if (!task.equalsIgnoreCase("name-change"))
 				{
-					if (task.equalsIgnoreCase("error") || task.equalsIgnoreCase("no-friends"))
+					if (task.equalsIgnoreCase("error") || task.equalsIgnoreCase("no-friends") || task.equalsIgnoreCase("same-player"))
 					{
 						firstMemberName = "";
 					}
@@ -489,19 +511,19 @@ public class SpectralClanMgmtButton
 					if (clanmembers.size() > 0)
 					{
 						// For selecting a name change, we only want to get the current name and store it in a local variable.
-						String selectedMember = clanmembers.get(sn);
+						ClanMember selectedMember = clanmembers.get(sn);
 						String adminMember = client.getLocalPlayer().getName();
 						
-						if (!selectedMember.equals(""))
+						if (selectedMember != null)
 						{
 							// You can't revoke your own permissions.
-							if (selectedMember.equals(adminMember))
+							if (selectedMember.getName().equals(adminMember))
 							{
 								task = "invalid-self";
 							}
 							else
 							{
-								int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMember).getRank()).getId();
+								int memberRank = clanSettings.titleForRank(selectedMember.getRank()).getId();
 								
 								// This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
 								if (memberRank != -1)
@@ -519,7 +541,7 @@ public class SpectralClanMgmtButton
 									else
 									{
 										firstMemberSelected = true;
-										firstMemberName = selectedMember;
+										firstMemberName = selectedMember.getName();
 										// Proceed to the next step.
 										confirmSelection();
 										return;
@@ -562,19 +584,19 @@ public class SpectralClanMgmtButton
 					if (clanmembers.size() > 0)
 					{
 						// For selecting a name change, we only want to get the current name and store it in a local variable.
-						String selectedMember = clanmembers.get(sn);
+						ClanMember selectedMember = clanmembers.get(sn);
 						String adminMember = client.getLocalPlayer().getName();
 						
-						if (!selectedMember.equals(""))
+						if (selectedMember != null)
 						{
 							// You can't restore your own permissions.
-							if (selectedMember.equals(adminMember))
+							if (selectedMember.getName().equals(adminMember))
 							{
 								task = "invalid-self";
 							}
 							else
 							{
-								int memberRank = clanSettings.titleForRank(clanSettings.findMember(selectedMember).getRank()).getId();
+								int memberRank = clanSettings.titleForRank(selectedMember.getRank()).getId();
 								
 								// This shouldn't be possible, but if they somehow select a member with the Guest rank, have it error out.
 								if (memberRank != -1)
@@ -592,7 +614,7 @@ public class SpectralClanMgmtButton
 									else
 									{
 										firstMemberSelected = true;
-										firstMemberName = selectedMember;
+										firstMemberName = selectedMember.getName();
 										// Proceed to the next step.
 										confirmSelection();
 										return;
@@ -770,6 +792,15 @@ public class SpectralClanMgmtButton
 			
 			chatboxPanelManager
 			.openTextMenuInput("'" + changedMem + "' isn't on your Friends list.<br>For name change exports, the member must be on your Friends list.")
+			.option("OK", () -> chatboxPanelManager.close())
+			.build(2);
+		}
+		else if (task.equals("same-person"))
+		{
+			removeListeners();
+			
+			chatboxPanelManager
+			.openTextMenuInput("You can't export a name change for yourself.<br>Ask another admin member to export your name change.")
 			.option("OK", () -> chatboxPanelManager.close())
 			.build(2);
 		}

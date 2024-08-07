@@ -74,7 +74,7 @@ public class SpectralClanMgmtHttpRequest
 			{
 				if (!response.isSuccessful())
 				{
-					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+					respBody.completeExceptionally(new IOException("Something went wrong. Report this issue with this response code to the developer: " + response.toString()));
 				}
 				else
 				{
@@ -206,7 +206,7 @@ public class SpectralClanMgmtHttpRequest
 		// URL of the web app for the script.
 		HttpUrl url = HttpUrl.parse(plugin.getDiscordURL());
 		String command = spectralCommand.substring(1);
-		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\"}";
+		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"accessKey\":\"" + config.memberKey() + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
@@ -229,7 +229,7 @@ public class SpectralClanMgmtHttpRequest
 			{
 				if (!response.isSuccessful())
 				{
-					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+					respBody.completeExceptionally(new IOException("Something went wrong. Report this issue with this response code to the developer: " + response.toString()));
 				}
 				else
 				{
@@ -252,7 +252,6 @@ public class SpectralClanMgmtHttpRequest
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
-		// URL of the web app for the script.
 		HttpUrl url = HttpUrl.parse(config.scriptURL());
 		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\"}";
 		
@@ -277,7 +276,7 @@ public class SpectralClanMgmtHttpRequest
 			{
 				if (!response.isSuccessful())
 				{
-					respBody.completeExceptionally(new IOException("Something went wrong.<br>Report this issue with this response code to the developer: " + response.toString()));
+					respBody.completeExceptionally(new IOException("Something went wrong. Report this issue with this response code to the developer: " + response.toString()));
 				}
 				else
 				{
