@@ -296,8 +296,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (gameState == GameState.LOGGED_IN)
 		{
-			// This is for the command cooldown. They have to wait 30 seconds after using any of spectral's commands to use another one.
-			// This should help to keep the web server from being flooded with requests.
+			// This is for the command use cooldown.
 			if (!coolDownFinished)
 			{
 				if (coolDown != -1)
@@ -325,19 +324,26 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			else
 			{
-				if (gameTickCount == 0)
+				if (gameTickCount > -1)
 				{
-					gameTickCount = 1;
+					gameTickCount++;
 				}
 			}
 			
+			// This is for when it's time to check permissions again and refresh the plugin data,
+			// since it doesn't need to wait 5 ticks before starting like it does when first logging in.
 			if (!commandProcessing && ready && attemptCount < 5 && !config.memberKey().equals("") && (permissionCheckTimer >= permissionCheckTime))
 			{
-				gameTickCount = 1;
-				pluginLoaded = false;
+				if (gameTickCount == -1)
+				{
+					gameTickCount = 5;
+					pluginLoaded = false;
+				}
 			}
 			
-			if (gameTickCount == 1)
+			// The plugin needs to wait 5 ticks instead of 1 after logging in before it does the initial request for the plugin's data,
+			// because when it only waited 1 tick, client.getClanSettings(0) would occasionally return null and so the data wouldn't be retrieved.
+			if (gameTickCount >= 5)
 			{
 				gameTickCount = -1;
 				
@@ -373,7 +379,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 				else if (commandProcessing && !config.memberKey().equals("") && !pluginLoaded && attemptCount < 5)
 				{
 					firstGameTick = false;
-					pluginLoaded = false;
 				}
 				
 				if (ready)
