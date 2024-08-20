@@ -192,7 +192,7 @@ public class SpectralClanMgmtButton
 	{
 		if (task.equals("add-new")) // adding a new main task
 		{
-			if (firstMemberSelected == false)
+			if (!firstMemberSelected)
 			{
 				// j is for the position of the child widget in the children array. 
 				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
@@ -263,7 +263,7 @@ public class SpectralClanMgmtButton
 		else if (task.equals("add-alt-get-new")) // first half of the add-alt overall task
 		{
 			// We're getting the new alt member here
-			if (firstMemberSelected == false)
+			if (!firstMemberSelected)
 			{
 				int sn = (j - 1) / 3;
 				
@@ -328,7 +328,7 @@ public class SpectralClanMgmtButton
 		else if (task.equals("add-alt-get-main")) // second half of the add-alt overall task
 		{
 			// If an Alt has been selected, but the Alt's Main hasn't been selected, this code segment will be run.
-			if (firstMemberSelected == true && secondMemberSelected == false)
+			if (firstMemberSelected && !secondMemberSelected)
 			{
 				// j is for the position of the child widget in the children array. 
 				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
@@ -380,7 +380,6 @@ public class SpectralClanMgmtButton
 					}
 					
 					secondMemberSelected = false;
-					// Proceed to the next step.
 					displayError();
 					return;
 				}
@@ -388,7 +387,7 @@ public class SpectralClanMgmtButton
 		}
 		else if (task.equals("name-change"))
 		{
-			if (firstMemberSelected == false)
+			if (!firstMemberSelected)
 			{
 				// j is for the position of the child widget in the children array. 
 				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
@@ -499,7 +498,7 @@ public class SpectralClanMgmtButton
 		}
 		else if (task.equals("revoke-permission"))
 		{
-			if (firstMemberSelected == false)
+			if (!firstMemberSelected)
 			{
 				// j is for the position of the child widget in the children array. 
 				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
@@ -572,7 +571,7 @@ public class SpectralClanMgmtButton
 		}
 		else if (task.equals("restore-permission"))
 		{
-			if (firstMemberSelected == false)
+			if (!firstMemberSelected)
 			{
 				// j is for the position of the child widget in the children array. 
 				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
@@ -638,6 +637,118 @@ public class SpectralClanMgmtButton
 					firstMemberName = "";
 					category = "";
 					// Proceed to the next step.
+					displayError();
+					return;
+				}
+			}
+		}
+		else if (task.equals("rank-swap-old")) // first half of the rank-swap overall task
+		{
+			if (!firstMemberSelected)
+			{
+				// j is for the position of the child widget in the children array. 
+				// sn is the calculated index value that acts as the key for the member's name in the clanmembers hashmap.
+				// So if j = 1, then sn will be 0. If j = 7, sn will be 2.
+				int sn = (j - 1) / 3;
+				
+				if (clanmembers != null)
+				{
+					if (clanmembers.size() > 0)
+					{
+						ClanMember selectedOldMainMember = clanmembers.get(sn);
+						
+						if (selectedOldMainMember != null)
+						{
+							int memberRank = clanSettings.titleForRank(selectedOldMainMember.getRank()).getId();
+							
+							// Check that the selected member has the required rank for Alts. 9 is the ID for the Alt rank's title.
+							if (memberRank == 9)
+							{
+								firstMemberSelected = true;
+								firstMemberName = selectedOldMainMember.getName();
+								confirmSelection();
+								return;
+							}
+							else
+							{
+								task = "invalid-old-main";
+								firstMemberName = selectedOldMainMember.getName();
+							}
+						}
+					}
+				}
+				
+				// We should only reach this point if the member selected wasn't a valid choice.
+				// If the task wasn't already changed, then it means the task's value is meant to be "error".
+				if (task.equalsIgnoreCase("rank-swap-old"))
+				{
+					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("rank-swap-old"))
+				{
+					if (task.equalsIgnoreCase("error"))
+					{
+						firstMemberName = "";
+					}
+					
+					firstMemberSelected = false;
+					// Proceed to the next step.
+					displayError();
+					return;
+				}
+			}
+		}
+		else if (task.equals("rank-swap-new")) // second half of the rank-swap overall task
+		{
+			if (firstMemberSelected && !secondMemberSelected)
+			{
+				int sn = (j - 1) / 3;
+				
+				if (clanmembers != null)
+				{
+					if (clanmembers.size() > 0)
+					{
+						ClanMember selectedOldAltMember = clanmembers.get(sn);
+						
+						if (selectedOldAltMember != null)
+						{
+							int memberRank = clanSettings.titleForRank(selectedOldAltMember.getRank()).getId();
+							
+							// Check that the selected member has one of the ranks for Mains.
+							if (memberRank == 9 || memberRank == -1) // 9 is the ID for the Alt rank's title. -1 is the Guest rank's title. Mains can't have either of those ranks.
+							{
+								task = "invalid-old-alt";
+								secondMemberName = selectedOldAltMember.getName();
+							}
+							else if (memberRank != 9 && (SpectralClanMgmtPlugin.isNormalRank(memberRank) || SpectralClanMgmtPlugin.isAdminRank(memberRank)))
+							{ // Have to include the check for Alt rank in the check here as well since it's a normal rank, but Mains can't have it.
+								
+								task = "rank-swap";
+								secondMemberSelected = true;
+								secondMemberName = selectedOldAltMember.getName();
+								confirmSelection();
+								return;
+							}
+						}
+					}
+				}
+				
+				// We should only reach this point if the member selected wasn't a valid choice.
+				// If the task wasn't already changed, then it means the task's value is meant to be "error".
+				if (task.equalsIgnoreCase("rank-swap-new"))
+				{
+					task = "error";
+				}
+				
+				if (!task.equalsIgnoreCase("rank-swap-new"))
+				{
+					if (task.equalsIgnoreCase("error"))
+					{
+						secondMemberName = "";
+					}
+					
+					secondMemberSelected = false;
 					displayError();
 					return;
 				}
@@ -722,6 +833,24 @@ public class SpectralClanMgmtButton
 			.openTextMenuInput(option + "Click Yes to export the change, No to start over, or Cancel to exit.")
 			.option("Yes", () -> exportChange(task, firstMemberName, category, ""))
 			.option("No", () -> selectRestorePermission(""))
+			.option("Cancel", () -> removeListeners())
+			.build(2);
+		}
+		else if (task.equals("rank-swap-old"))
+		{
+			chatboxPanelManager
+			.openTextMenuInput("You've selected '" + firstMemberName + "' as the old Main. Is this correct?<br>Click Yes to proceed, No to reselect the old Main, or Cancel to exit.")
+			.option("Yes", () -> selectOldAlt())
+			.option("No", () -> selectOldMain())
+			.option("Cancel", () -> removeListeners())
+			.build(2);
+		}
+		else if (task.equals("rank-swap"))
+		{
+			chatboxPanelManager
+			.openTextMenuInput("You've selected '" + secondMemberName + "' as the new Main. Is this correct?<br>Click Yes to export the data, No to reselect the new Main, or Cancel to exit.")
+			.option("Yes", () -> exportChange(task, firstMemberName, secondMemberName, ""))
+			.option("No", () -> selectOldAlt())
 			.option("Cancel", () -> removeListeners())
 			.build(2);
 		}
@@ -843,6 +972,48 @@ public class SpectralClanMgmtButton
 			.option("OK", () -> chatboxPanelManager.close())
 			.build(1);
 		}
+		else if (task.equals("invalid-old-main"))
+		{
+			//The old Main should have the Alt rank, not one of the ranks for mains.
+			// Double check that the selected member's name is still set in its variable.
+			if (!firstMemberName.equals(""))
+			{
+				task = "rank-swap-old";
+				
+				String oldMain = firstMemberName;
+				firstMemberName = "";
+				
+				chatboxPanelManager
+				.openTextMenuInput("The member you've selected, '" + oldMain + "', doesn't have the Alt rank.<br>The old Main should have the Alt rank.<br>Select a different member for the old Main, or click cancel to exit.")
+				.option("Cancel", () -> removeListeners())
+				.build(3);
+			}
+			else
+			{
+				task = "error";
+			}
+		}
+		else if (task.equals("invalid-old-alt"))
+		{
+			//The old Alt should have whatever rank the old Main had before, not the Alt rank.
+			// Double check that the selected member's name is still set in its variable.
+			if (!secondMemberName.equals(""))
+			{
+				task = "rank-swap-new";
+				
+				String oldAlt = secondMemberName;
+				secondMemberName = "";
+				
+				chatboxPanelManager
+				.openTextMenuInput("The member you've selected, '" + oldAlt + "', has the Alt rank.<br>The new Main should have a normal rank.<br>Select a different member for the new Main, or click cancel to exit.")
+				.option("Cancel", () -> removeListeners())
+				.build(3);
+			}
+			else
+			{
+				task = "error";
+			}
+		}
 		else if (task.equals("error"))
 		{
 			removeListeners();
@@ -876,8 +1047,7 @@ public class SpectralClanMgmtButton
 						// secondArg = newMemberName
 						// thirdArg = blank
 						fArg = firstArg;
-						String tempPlayerName = secondArg;
-						sArg = Text.sanitize(tempPlayerName);
+						sArg = Text.sanitize(secondArg);
 					}
 					else if (task.equals("add-alt"))
 					{
@@ -885,20 +1055,16 @@ public class SpectralClanMgmtButton
 						// secondArg = mainMemberName
 						// thirdArg = newMemberName
 						fArg = firstArg;
-						String tempPlayerName = thirdArg;
-						tArg = Text.sanitize(tempPlayerName);
-						tempPlayerName = secondArg;
-						sArg = Text.sanitize(tempPlayerName);
+						sArg = Text.sanitize(secondArg);
+						tArg = Text.sanitize(thirdArg);
 					}
 					else if (task.equals("name-change"))
 					{
 						// firstArg = memberCurrentName
 						// secondArg = memberOldName
 						// thirdArg = memberType
-						String tempPlayerName = firstArg;
-						fArg = Text.sanitize(tempPlayerName);
-						tempPlayerName = secondArg;
-						sArg = Text.sanitize(tempPlayerName);
+						fArg = Text.sanitize(firstArg);
+						sArg = Text.sanitize(secondArg);
 						tArg = thirdArg;
 					}
 					else if (task.equals("revoke-permission") || task.equals("restore-permission"))
@@ -906,10 +1072,16 @@ public class SpectralClanMgmtButton
 						// firstArg = selected member's name
 						// secondArg = permission selection
 						// thirdArg = blank
-						String tempPlayerName = firstArg;
-						fArg = Text.sanitize(tempPlayerName);
+						fArg = Text.sanitize(firstArg);
 						sArg = secondArg;
-						tArg = thirdArg;
+					}
+					else if (task.equals("rank-swap"))
+					{
+						// firstArg = old Main's name
+						// secondArg = new Main's name
+						// thirdArg = blank
+						fArg = Text.sanitize(firstArg);
+						sArg = Text.sanitize(secondArg);
 					}
 					
 					httpRequest.setIsReady(false);
@@ -1113,7 +1285,7 @@ public class SpectralClanMgmtButton
 		.build(2);
 	}
 	
-	// Get the new Alt member's Main in the clan.
+	// Admin chose to export a new Alt clan member. Get the Main for the new Alt in the clan.
 	private void selectMain()
 	{
 		// We would only reach this point after selectAlt has been run, 
@@ -1129,6 +1301,50 @@ public class SpectralClanMgmtButton
 		
 		chatboxPanelManager
 		.openTextMenuInput("Select the Main's name for the new Alt from the left column.<br>Or click cancel to exit.")
+		.option("Cancel", () -> removeListeners())
+		.build(2);
+	}
+	
+	// Admin chose to export a rank swap. Get the member's old Main in the clan.
+	private void selectOldMain()
+	{
+		// Since there's multiple methods where setListeners can be called and these methods can be visited more than once,
+		// we need to check if the flag for them has been set and, if the listeners haven't been added, we'll add them.
+		if (listenersSet == false)
+		{
+			setListeners();
+		}
+		
+		// Set the task to the admin's choice, in this case it's the first half of the task, 
+		// reset the flag and global variables for that part of the task, then proceed.
+		task = "rank-swap-old";
+		firstMemberSelected = false;
+		firstMemberName = "";
+		
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Select the member's old Main from the left column.<br>Or click Cancel to exit.")
+		.option("Cancel", () -> removeListeners())
+		.build(2);
+	}
+	
+	// Admin chose to export a rank swap. Get the member's new Main in the clan.
+	private void selectOldAlt()
+	{
+		// We would only reach this point after selectOldMain has been run, 
+		// so the listeners would've already been added and we don't need the check here.
+		
+		// Set the task to the admin's choice, in this case it's the second half of the task, 
+		// reset the flag and global variables for that part of the task, then proceed.
+		task = "rank-swap-new";
+		secondMemberSelected = false;
+		secondMemberName = "";
+		
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Select the member's new Main from the left column.<br>Or click Cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build(2);
 	}
@@ -1285,6 +1501,18 @@ public class SpectralClanMgmtButton
 		.build(2);
 	}
 	
+	private void nameOrPermissionChange()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Are you exporting a Name or Permission change?<br>Select an option below, or click Cancel to exit.")
+		.option("Name", () -> nameChangeCheckPreReq())
+		.option("Permission", () -> permissionChangeExport())
+		.option("Cancel", () -> cancelOptions())
+		.build(2);
+	}
+	
 	private void cancelOptions()
 	{
 		wasClicked = false;
@@ -1337,10 +1565,10 @@ public class SpectralClanMgmtButton
 										wasClicked = true;
 										
 										chatboxPanelManager
-										.openTextMenuInput("Select an option below or click cancel to exit..")
-										.option("Export New Member", () -> newMemberExport())
-										.option("Export Name Change", () -> nameChangeCheckPreReq())
-										.option("Export Permission Change", () -> permissionChangeExport())
+										.openTextMenuInput("Select an Export option below, or click Cancel to exit.")
+										.option("New Member", () -> newMemberExport())
+										.option("Name or Permission Change", () -> nameOrPermissionChange())
+										.option("Rank Swap", () -> selectOldMain())
 										.option("Cancel", () -> cancelOptions())
 										.build(1);
 									}

@@ -128,6 +128,11 @@ public class SpectralClanMgmtHttpRequest
 			arg2 = "player";
 			arg3 = "category";
 		}
+		else if (task.equalsIgnoreCase("rank-swap"))
+		{
+			arg2 = "oldMain";
+			arg3 = "newMain";
+		}
 		
 		HttpUrl adminURL;
 		
@@ -143,7 +148,7 @@ public class SpectralClanMgmtHttpRequest
 		
 		String payload = "";
 		
-		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission") || task.equalsIgnoreCase("add-new"))
+		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission") || task.equalsIgnoreCase("add-new") || task.equalsIgnoreCase("rank-swap"))
 		{
 			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"accessKey\":\"" + config.memberKey() + "\"}";
 		}
