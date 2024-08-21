@@ -839,7 +839,7 @@ public class SpectralClanMgmtButton
 		else if (task.equals("rank-swap-old"))
 		{
 			chatboxPanelManager
-			.openTextMenuInput("You've selected '" + firstMemberName + "' as the old Main. Is this correct?<br>Click Yes to proceed, No to reselect the old Main, or Cancel to exit.")
+			.openTextMenuInput("You've selected '" + firstMemberName + "' as the old Main. Is this correct?<br>Click Yes to proceed, No to reselect, or Cancel to exit.")
 			.option("Yes", () -> selectOldAlt())
 			.option("No", () -> selectOldMain())
 			.option("Cancel", () -> removeListeners())
@@ -848,7 +848,7 @@ public class SpectralClanMgmtButton
 		else if (task.equals("rank-swap"))
 		{
 			chatboxPanelManager
-			.openTextMenuInput("You've selected '" + secondMemberName + "' as the new Main. Is this correct?<br>Click Yes to export the data, No to reselect the new Main, or Cancel to exit.")
+			.openTextMenuInput("You've selected '" + secondMemberName + "' as the new Main. Is this correct?<br>Click Yes to export the data, No to reselect, or Cancel to exit.")
 			.option("Yes", () -> exportChange(task, firstMemberName, secondMemberName, ""))
 			.option("No", () -> selectOldAlt())
 			.option("Cancel", () -> removeListeners())
