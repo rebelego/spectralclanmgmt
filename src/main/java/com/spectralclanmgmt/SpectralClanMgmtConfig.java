@@ -37,4 +37,25 @@ public interface SpectralClanMgmtConfig extends Config
 	hidden = true
 	)
 	void setMemberKey(String key);
+	
+	@ConfigItem(
+	keyName = "registered",
+	name = "",
+	description = "",
+	position = 3,
+	hidden = true
+	)
+	default String registered()
+	{
+		return "";
+	};
+	
+	@ConfigItem(
+	keyName = "registered",
+	name = "",
+	description = "",
+	position = 4,
+	hidden = true
+	)
+	void setRegistered(String newRegistered);
 }
