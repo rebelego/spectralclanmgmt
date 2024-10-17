@@ -356,7 +356,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			{
 				gameTickCount = -1;
 				
-				if (!commandProcessing && !pluginLoaded && !config.memberKey().equals("") && attemptCount < 5)
+				if (!commandProcessing && !pluginLoaded && !config.scriptURL().equals("") && attemptCount < 5)
 				{
 					commandProcessing = true;
 					final String player = client.getLocalPlayer().getName();
@@ -386,7 +386,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 						}
 					});
 				}
-				else if (commandProcessing && !config.memberKey().equals("") && !pluginLoaded && attemptCount < 5)
+				else if (commandProcessing && !config.scriptURL().equals("") && !pluginLoaded && attemptCount < 5)
 				{
 					firstGameTick = false;
 				}
@@ -454,8 +454,17 @@ public class SpectralClanMgmtPlugin extends Plugin
 			validAccessKey = false;
 			canUseDiscordCommands = false;
 			canUseSpectralCommand = false;
-			firstGameTick = false;
-			pluginLoaded = false;
+			if (!config.memberKey().equals(""))
+			{
+				firstGameTick = false;
+				pluginLoaded = false;
+			}
+			else
+			{
+				firstGameTick = true;
+				gameTickCount = -1;
+				pluginLoaded = true;
+			}
 			ready = false;
 		}
 		else
@@ -1199,7 +1208,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			String[] result = res.split("\\;");
 			
-			if (result[0].equalsIgnoreCase("perma-fail") || result[0].equalsIgnoreCase("url-fail") || result[0].equalsIgnoreCase("key-fail"))
+			if (result[0].equalsIgnoreCase("perma-fail") || result[0].equalsIgnoreCase("url-fail"))
 			{
 				adminURL = "";
 				discordURL = "";
@@ -1216,7 +1225,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 				attemptCount = 5;
 				ready = true;
 			}
-			else if (result[0].equalsIgnoreCase("attempt-fail") || result[0].equalsIgnoreCase("reg-fail"))
+			else if (result[0].equalsIgnoreCase("attempt-fail") || result[0].equalsIgnoreCase("reg-fail") || result[0].equalsIgnoreCase("key-fail"))
 			{
 				pluginLoaded = true;
 				ready = true;
