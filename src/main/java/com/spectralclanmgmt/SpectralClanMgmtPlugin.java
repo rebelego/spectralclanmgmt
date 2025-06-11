@@ -694,7 +694,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	// This method is a modified version of code provided by aHooder.
 	private boolean getCommand(ChatInput chatInput, String message)
 	{
-		final String[] stringStack = client.getStringStack();
 		final int[] intStack = client.getIntStack();
 		int intStackCount = client.getIntStackSize();
 		final int chatType = intStack[intStackCount - 2];
