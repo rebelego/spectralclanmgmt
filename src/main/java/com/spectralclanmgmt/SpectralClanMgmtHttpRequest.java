@@ -39,22 +39,16 @@ public class SpectralClanMgmtHttpRequest
 		this.button = button;
 	}
 	
-	// For getting the permissions, config links, and phrases all at once.
-	// This will be called after start up and when a command is used and it's been at least 5 minutes since the permissions were last checked.
-	protected String getRequestAsyncPluginData(String configLink, String player, String acctHash)
+	protected String getRequestAsyncPluginData(String player, String acctHash)
 	{
-		if (!configLink.equalsIgnoreCase("discord") && !configLink.equalsIgnoreCase("both") && !configLink.equalsIgnoreCase("reg-fail"))
-		{
-			return configLink;
-		}
-		
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		HttpUrl url = HttpUrl.parse(config.scriptURL()).newBuilder()
-		.addQueryParameter("configLink", configLink)
+		//.addQueryParameter("task", "getPluginData")
 		.addQueryParameter("player", player)
 		.addQueryParameter("acctHash", acctHash)
 		.addQueryParameter("accessKey", config.memberKey())
+		.addQueryParameter("configLink", "both") //This will be removed when the new servers are set up.
 		.build();
 		
 		Request request = new Request.Builder()
@@ -97,7 +91,7 @@ public class SpectralClanMgmtHttpRequest
 	/* 
 	This is for the Admin-related export tasks in the SpectralClanMgmtButton class (new member additions and name changes).
 	 */
-	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg, String adminPlayer, String acctHash)
+	protected CompletableFuture<String> postRequestAsyncAdmin(String task, String firstArg, String secondArg, String thirdArg, String adminPlayer, String adminRank, String acctHash)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
@@ -108,11 +102,13 @@ public class SpectralClanMgmtHttpRequest
 		String arg5 = "adminPlayer";
 		String arg6 = "accessKey";
 		String arg7 = "acctHash";
+		String arg8 = "adminRank";
 		
 		if (task.equalsIgnoreCase("add-new"))
 		{
 			arg2 = "joinDate";
 			arg3 = "mainPlayer";
+			arg4 = "rank";
 		}
 		else if (task.equalsIgnoreCase("add-alt"))
 		{
@@ -126,52 +122,21 @@ public class SpectralClanMgmtHttpRequest
 			arg3 = "oldName";
 			arg4 = "memberType";
 		}
-		else if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
-		{
-			arg2 = "player";
-			arg3 = "category";
-		}
 		else if (task.equalsIgnoreCase("rank-swap"))
 		{
 			arg2 = "oldMain";
 			arg3 = "newMain";
-		}
-		else if (task.equalsIgnoreCase("discord-deserter") || task.equalsIgnoreCase("discord-returnee"))
-		{
-			arg2 = "mainPlayer";
+			arg4 = "rank";
 		}
 		
-		HttpUrl adminURL;
+		HttpUrl admin = HttpUrl.parse(config.scriptURL());
 		
-		// URL of the web app for the script.
-		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission"))
-		{
-			adminURL = HttpUrl.parse(config.scriptURL());
-		}
-		else
-		{
-			adminURL = HttpUrl.parse(plugin.getAdminURL());
-		}
-		
-		String payload = "";
-		
-		if (task.equalsIgnoreCase("revoke-permission") || task.equalsIgnoreCase("restore-permission") || task.equalsIgnoreCase("add-new") || task.equalsIgnoreCase("rank-swap"))
-		{
-			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"" + arg6 + "\":\"" + config.memberKey() + "\",\"" + arg7 + "\":\"" + acctHash + "\"}";
-		}
-		else if (task.equalsIgnoreCase("discord-deserter"))
-		{
-			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"" + arg6 + "\":\"" + config.memberKey() + "\",\"" + arg7 + "\":\"" + acctHash + "\"}";
-		}
-		else
-		{
-			payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"" + arg6 + "\":\"" + config.memberKey() + "\",\"" + arg7 + "\":\"" + acctHash + "\"}";
-		}
+		String payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"" + arg6 + "\":\"" + config.memberKey() + "\",\"" + arg7 + "\":\"" + acctHash + "\",\"" + arg8 + "\":\"" + adminRank + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
 		Request request = new Request.Builder()
-									 .url(adminURL)
+									 .url(admin)
 									 .post(body)
 									 .addHeader("Content-Type", "application/json")
 									 .build();
@@ -216,7 +181,7 @@ public class SpectralClanMgmtHttpRequest
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		// URL of the web app for the script.
-		HttpUrl url = HttpUrl.parse(config.scriptURL());
+		HttpUrl url = HttpUrl.parse(config.scriptURL() + "/discord");
 		String command = spectralCommand.substring(1);
 		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"accessKey\":\"" + config.memberKey() + "\",\"acctHash\":\"" + acctHash + "\"}";
 		
@@ -310,21 +275,12 @@ public class SpectralClanMgmtHttpRequest
 		return respBody;
 	}
 	
-	/*
-	This is the postRequestAsync method for processing and storing a player's account hash in a private data storage location.
-	This will send an http request to Spectral's Discord application and trigger its Discord bot to ping the member who used the !addme command
-	in Spectral's private Discord server to confirm that they initiated the request. Only the member can respond to the bot's message, 
-	and the member has up to 5 minutes to respond to it in the server before the application will return a failed response. 
-	Once the member confirms that they initiated the request, the application will process and store the account hash and return a response.
-	Including the player's name and account hash, along with a private access key, was the best option I could come up with for 
-	validating if any http requests sent to Spectral's web app came from this plugin.
-	*/
-	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String task, String player, String acctHash)
+	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String command, String player, String acctHash)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
-		HttpUrl url = HttpUrl.parse(plugin.getDiscordURL());
-		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\"}";
+		HttpUrl url = HttpUrl.parse(config.scriptURL());
+		String payload = "{\"task\":\"discord\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
@@ -353,7 +309,7 @@ public class SpectralClanMgmtHttpRequest
 				{
 					try
 					{
-						respBody.complete(plugin.updateRegistered(player, response));
+						respBody.complete(plugin.updateRegistered(response));
 					}
 					finally
 					{
