@@ -576,7 +576,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 					{
 						if (!message.trim().toLowerCase().equals(COMMAND_KEY) && !message.trim().toLowerCase().equals(COMMAND_ADDME))
 						{
-							if (!commandProcessing && attemptCount < 5 && coolDownFinished && pluginLoaded && ready && validAccessKey && reg)
+							if (!commandProcessing && attemptCount < 5 && coolDownFinished && pluginLoaded && ready && validAccessKey && reg && canUseDiscordCommands)
 							{
 								commandProcessing = true;
 								coolDown = -1;
@@ -620,6 +620,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 						if (!message.trim().toLowerCase().equals(COMMAND_KEY) && !message.trim().toLowerCase().equals(COMMAND_ADDME) && !pluginLoaded && !ready)
 						{
 							msg = "The plugin's data hasn't finished loading yet. Wait a minute before trying again.";
+						}
+						else if (!message.trim().toLowerCase().equals(COMMAND_KEY) && !message.trim().toLowerCase().equals(COMMAND_ADDME) && !canUseDiscordCommands)
+						{
+							msg = "You don't have permission to use the Discord commands.";
+						}
+						else if ((message.trim().toLowerCase().equals(COMMAND_KEY) || message.trim().toLowerCase().equals(COMMAND_ADDME)) && !canUseSpectralCommand)
+						{
+							msg = "You don't have permission to use that command.";
 						}
 						else if (message.trim().toLowerCase().equals(COMMAND_ADDME) && reg)
 						{
@@ -836,12 +844,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 		reg = resp.get("registered").getAsBoolean();
 		int downTime = resp.get("downTime").getAsInt();
 		validAccessKey = permission.get(0).getAsBoolean();
-		
-		if (validAccessKey && reg)
-		{
-			canUseSpectralCommand = permission.get(1).getAsBoolean();
-			canUseDiscordCommands = permission.get(2).getAsBoolean();
-		}
+		canUseSpectralCommand = permission.get(1).getAsBoolean();
+		canUseDiscordCommands = permission.get(2).getAsBoolean();
 		
 		if (downTime > 0)
 		{

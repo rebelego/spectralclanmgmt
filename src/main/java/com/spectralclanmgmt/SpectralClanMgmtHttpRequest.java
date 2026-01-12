@@ -128,6 +128,10 @@ public class SpectralClanMgmtHttpRequest
 			arg3 = "newMain";
 			arg4 = "rank";
 		}
+		else if (task.equalsIgnoreCase("discord-deserter") || task.equalsIgnoreCase("discord-returnee"))
+		{
+			arg2 = "mainPlayer";
+		}
 		
 		HttpUrl admin = HttpUrl.parse(config.scriptURL());
 		
@@ -275,12 +279,12 @@ public class SpectralClanMgmtHttpRequest
 		return respBody;
 	}
 	
-	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String command, String player, String acctHash, int rank)
+	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String task, String player, String acctHash, int rank)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		HttpUrl url = HttpUrl.parse(config.scriptURL());
-		String payload = "{\"task\":\"register\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\",\"rank\":\"" + String.valueOf(rank) + "\"}";
+		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\",\"rank\":\"" + String.valueOf(rank) + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		

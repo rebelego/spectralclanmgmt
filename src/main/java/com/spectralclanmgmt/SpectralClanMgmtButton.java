@@ -254,7 +254,7 @@ public class SpectralClanMgmtButton
 				{
 					// With the slot number, we get the selected member's name, 
 					// and with the member's name we get their join date and store it in these variables for later.
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedNewMember = clanmembers.get(widgetText);
 					String selectedNewMemberDate = "";
 					
@@ -314,7 +314,7 @@ public class SpectralClanMgmtButton
 				// We're getting the new alt member here
 				if (!firstMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedNewMember = clanmembers.get(widgetText);
 					String selectedNewMemberDate = "";
 					
@@ -373,7 +373,7 @@ public class SpectralClanMgmtButton
 				if (firstMemberSelected && !secondMemberSelected)
 				{
 					// For the Alt's Main, we only need its name.
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedMainMember = clanmembers.get(widgetText);
 					
 					if (selectedMainMember != null)
@@ -429,7 +429,7 @@ public class SpectralClanMgmtButton
 				if (!firstMemberSelected)
 				{
 					// For selecting a name change, we only want to get the current name and store it in a local variable.
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedChangedMember = clanmembers.get(widgetText);
 					
 					if (selectedChangedMember != null)
@@ -541,7 +541,7 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedOldMainMember = clanmembers.get(widgetText);
 					
 					if (selectedOldMainMember != null)
@@ -590,7 +590,7 @@ public class SpectralClanMgmtButton
 			{
 				if (firstMemberSelected && !secondMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText();
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
 					ClanMember selectedOldAltMember = clanmembers.get(widgetText);
 					
 					if (selectedOldAltMember != null)
@@ -638,6 +638,38 @@ public class SpectralClanMgmtButton
 						
 						secondMemberSelected = false;
 						playerRank = "";
+						displayError();
+						return;
+					}
+				}
+			}
+			else if (task.equalsIgnoreCase("discord-deserter") || task.equalsIgnoreCase("discord-returnee"))
+			{
+				if (!firstMemberSelected)
+				{
+					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					ClanMember selectedMember = clanmembers.get(widgetText);
+							
+					if (selectedMember != null)
+					{
+						firstMemberSelected = true;
+						firstMemberName = widgetText;
+						confirmSelection();
+						return;
+					}
+					
+					// We should only reach this point if the member selected wasn't a valid choice.
+					// If the task wasn't already changed, then it means the task's value is meant to be "error".
+					if (task.equalsIgnoreCase("discord-deserter") || task.equalsIgnoreCase("discord-returnee"))
+					{
+						task = "error";
+					}
+					
+					if (!task.equalsIgnoreCase("discord-deserter") && !task.equalsIgnoreCase("discord-returnee"))
+					{
+						firstMemberName = "";
+						firstMemberSelected = false;
+						// Proceed to the next step.
 						displayError();
 						return;
 					}
@@ -701,6 +733,24 @@ public class SpectralClanMgmtButton
 			.openTextMenuInput("You've selected '" + secondMemberName + "' as the new Main. Is this correct?<br>Click Yes to export the data, No to reselect, or Cancel to exit.")
 			.option("Yes", () -> exportChange(task, firstMemberName, secondMemberName, playerRank))
 			.option("No", () -> selectOldAlt())
+			.option("Cancel", () -> removeListeners())
+			.build(2);
+		}
+		else if (task.equals("discord-deserter"))
+		{
+			chatboxPanelManager
+			.openTextMenuInput("You have selected '" + firstMemberName + "'. Is this correct?<br>Click Yes to export the change, No to reselect, or Cancel to exit.")
+			.option("Yes", () -> exportChange(task, firstMemberName, "", ""))
+			.option("No", () -> discordDeserterExport())
+			.option("Cancel", () -> removeListeners())
+			.build(2);
+		}
+		else if (task.equals("discord-returnee"))
+		{
+			chatboxPanelManager
+			.openTextMenuInput("You have selected '" + firstMemberName + "'. Is this correct?<br>Click Yes to export the change, No to reselect, or Cancel to exit.")
+			.option("Yes", () -> exportChange(task, firstMemberName, "", ""))
+			.option("No", () -> discordReturneeExport())
 			.option("Cancel", () -> removeListeners())
 			.build(2);
 		}
@@ -894,21 +944,21 @@ public class SpectralClanMgmtButton
 			
 			if (config.memberKey().equals("") || !plugin.validAccessKey)
 			{
-				errorMsg = "A valid access key isn't set in the plugin's settings.<br>Use the !key command to get the access key first.";
+				errorMsg = "The access key set in the plugin's settings isn't valid.<br>Use the !key command in the clan chat to get your access key first.<br>If the issue persists after your access key is set, contact the developer.";
 			}
 			else if (!plugin.reg)
 			{
-				errorMsg = "Your player ID isn't registered. Use the !addme command and<br>follow the steps to register your player ID first.";
+				errorMsg = "Your player ID doesn't seem to be registered. If you've registered but recently changed your name,<br>ask another Recruiter+ to export your name change first. Once they have, turn the plugin off and on again.<br>If the issue persists, contact the developer.";
 			}
 			else if (!plugin.checkURL(config.scriptURL()))
 			{
-				errorMsg = "The URL for Spectral's server isn't valid. If the URL is valid and<br>you continue to get this message, contact the developer.";
+				errorMsg = "A valid URL for Spectral's web app isn't set in the plugin's settings.<br>Set the URL in the plugin's settings before trying again.<br>If the issue persists when there is a valid URL set, contact the developer.";
 			}
 			
 			chatboxPanelManager
 			.openTextMenuInput(errorMsg)
 			.option("OK", () -> chatboxPanelManager.close())
-			.build(2);
+			.build(3);
 		}
 	}
 	
@@ -1138,6 +1188,62 @@ public class SpectralClanMgmtButton
 		.build(2);
 	}
 	
+	private void discordMemberChange()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Are you exporting a Discord Deserter or Returnee?<br>Select an option below, or click Cancel to exit.")
+		.option("Discord Deserter", () -> discordDeserterExport())
+		.option("Discord Returnee", () -> discordReturneeExport())
+		.option("Cancel", () -> cancelOptions())
+		.build(2);
+	}
+	
+	// Admin chose to export a Discord Deserter. Get the member's Main in the clan.
+	private void discordDeserterExport()
+	{
+		// Since there's multiple methods where setListeners can be called and these methods can be visited more than once,
+		// we need to check if the flag for them has been set and, if the listeners haven't been added, we'll add them.
+		if (listenersSet == false)
+		{
+			setListeners();
+		}
+		
+		task = "discord-deserter";
+		firstMemberSelected = false;
+		firstMemberName = "";
+		
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Select the member's Main from the left column.<br>Or click Cancel to exit.")
+		.option("Cancel", () -> removeListeners())
+		.build(2);
+	}
+	
+	// Admin chose to export a Discord Returnee. Get the member's Main in the clan.
+	private void discordReturneeExport()
+	{
+		// Since there's multiple methods where setListeners can be called and these methods can be visited more than once,
+		// we need to check if the flag for them has been set and, if the listeners haven't been added, we'll add them.
+		if (listenersSet == false)
+		{
+			setListeners();
+		}
+		
+		task = "discord-returnee";
+		firstMemberSelected = false;
+		firstMemberName = "";
+		
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Select the member's Main from the left column.<br>Or click Cancel to exit.")
+		.option("Cancel", () -> removeListeners())
+		.build(2);
+	}
+	
 	// Admin chose to export a name change.
 	private void selectNameChange()
 	{
@@ -1249,6 +1355,7 @@ public class SpectralClanMgmtButton
 						.option("Add Member", () -> newMemberExport())
 						.option("Name Change", () -> nameChangeCheckPreReq())
 						.option("Rank Swap", () -> selectOldMain())
+						.option("Discord Deserter or Returnee", () -> discordMemberChange())
 						.option("Cancel", () -> cancelOptions())
 						.build(1);
 					}
