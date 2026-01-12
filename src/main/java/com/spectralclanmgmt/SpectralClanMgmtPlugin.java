@@ -26,6 +26,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import net.runelite.client.util.Text;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
@@ -69,10 +70,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	@Inject
 	private SpectralClanMgmtButton spectralClanMemberButton;
-	
-	//private SpectralCompetition spectralCompetition;
-	
-	private JsonObject competitionData;
 	
 	private ClanSettings clanSettings;
 	
@@ -130,8 +127,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private final String COMMAND_MOD = "!mod";
 	
 	private final String COMMAND_RECRUIT = "!recruit";
-	
-	private String regexPattern = "";
 	
 	/*
 	Since I can't seem to be able to simply override the open method in the ChatboxTextMenuInput class
@@ -228,21 +223,12 @@ public class SpectralClanMgmtPlugin extends Plugin
 		chatCommandManager.registerCommand(COMMAND_MOD,null, this::getCommand);
 		chatCommandManager.registerCommand(COMMAND_RECRUIT,null, this::getCommand);
 		reg = true;
-		//spectralCompetition = null;
-		competitionData = null;
 	}
 	
 	@Override
 	protected void shutDown() throws Exception
 	{
 		chatboxPanelManager.shutdown();
-		/*
-		if (spectralCompetition != null)
-		{
-			spectralCompetition.shutdown();
-			spectralCompetition = null;
-		}
-		*/
 		httpRequest = null;
 		chatCommandManager.unregisterCommand(COMMAND_MOD);
 		chatCommandManager.unregisterCommand(COMMAND_RECRUIT);
@@ -255,7 +241,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 	public void onGameStateChanged(GameStateChanged gameStateChanged)
 	{
 		gameState = gameStateChanged.getGameState();
-		boolean throwAwayBoolean = checkGameState(gameState);
+		boolean isGameStateLoggedIn = checkGameState(gameState);
 		
 		return;
 	}
@@ -342,58 +328,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 		}
 	}
-	
-	/*
-	@Subscribe
-	public void onScriptPreFired(ScriptPreFired scriptPreFired)
-	{
-		if (scriptPreFired.getScriptId() == 4253)
-		{
-			var args4253 = scriptPreFired.getScriptEvent().getArguments();
-		}
-		else if (scriptPreFired.getScriptId() == 4254)
-		{
-			var args4254 = scriptPreFired.getScriptEvent().getArguments();
-		}
-		else if (scriptPreFired.getScriptId() == 4302)
-		{
-			var args4302 = scriptPreFired.getScriptEvent().getArguments();
-		}
-		else if (scriptPreFired.getScriptId() == 4319)
-		{
-			var args4319 = scriptPreFired.getScriptEvent().getArguments();
-		}
-		else if (scriptPreFired.getScriptId() == 4320)
-		{
-			var args4320 = scriptPreFired.getScriptEvent().getArguments();
-		}
-	}
-	
-	@Subscribe
-	public void onScriptPostFired(ScriptPostFired scriptPostFired)
-	{
-		if (scriptPostFired.getScriptId() == 4253)
-		{
-			
-		}
-		else if (scriptPostFired.getScriptId() == 4254)
-		{
-			
-		}
-		else if (scriptPostFired.getScriptId() == 4302)
-		{
-			
-		}
-		else if (scriptPostFired.getScriptId() == 4319)
-		{
-			
-		}
-		else if (scriptPostFired.getScriptId() == 4320)
-		{
-			
-		}
-	}
-	*/
 	
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
@@ -622,19 +556,19 @@ public class SpectralClanMgmtPlugin extends Plugin
 					
 					if (!checkURL(config.scriptURL()))
 					{
-						msg = "A valid URL for Spectral's web server isn't set in the plugin's settings. If the problem persists when a valid URL is set and you're a ranked member of Spectral, contact the developer about this issue.";
+						msg = "A valid URL for Spectral's web app isn't set in the plugin's settings. If the issue persists when a valid URL is set and you're a ranked member of Spectral, contact the developer.";
 					}
 					
 					if (!message.trim().toLowerCase().equals(COMMAND_KEY) && !message.trim().toLowerCase().equals(COMMAND_ADDME))
 					{
 						if (!reg)
 						{
-							msg = "Your player ID hasn't been registered. If you're a ranked member of Spectral, use the !addme command and follow the steps to register your player ID first. If the problem persists afterwards, contact the developer about this issue.";
+							msg = "Your player ID hasn't been registered. If you're a ranked member of Spectral, use the !addme command in the clan chat to register your player ID first. If the issue persists afterwards, contact the developer.";
 						}
 						
 						if (!validAccessKey || config.memberKey().equals(""))
 						{
-							msg = "Your access key either isn't valid or isn't set. If you're a ranked member of Spectral and you've registered your player ID, use the !key command to get your access key first. If the problem persists afterwards, contact the developer about this issue.";
+							msg = "Your access key either isn't valid or isn't set. If you're a ranked member of Spectral and you've registered your player ID, use the !key command in the clan chat to get your access key first. If the issue persists after your access key is set, contact the developer.";
 						}
 					}
 					
@@ -693,7 +627,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 						}
 						else if (message.trim().toLowerCase().equals(COMMAND_KEY) && !reg)
 						{
-							msg = "The command failed because your player ID doesn't seem to be registered. If you're a ranked member of Spectral and you haven't registered your player ID, use the !addme command and follow the steps to do so first. If you've registered your player ID before, but you've changed your name since then, ask a Recruiter or Mod to export your name change. Wait for them to confirm they've exported it before turning the plugin off and on again. If the issue persists, contact the developer.";
+							msg = "The command failed because your player ID doesn't seem to be registered. If you're a ranked member of Spectral and you haven't registered your player ID, use the !addme command in the clan chat to do so first. If you've registered your player ID before, but you've changed your name since then, ask a Recruiter or Mod to export your name change. Wait for them to confirm they've exported it before turning the plugin off and on again. If the issue persists, contact the developer.";
 						}
 						else if (message.trim().toLowerCase().equals(COMMAND_KEY) && validAccessKey)
 						{
@@ -707,7 +641,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 							}
 							else if (attemptCount >= 5)
 							{
-								msg = "The command failed because your permissions couldn't be verified. Make sure your player ID is registered, and that a valid URL for Spectral's web server along with your access key are set in the plugin's settings first. If the problem persists afterwards and you're a ranked member of Spectral, contact the developer about this issue.";
+								msg = "The command failed because your permissions couldn't be verified. Make sure your player ID is registered, and that a valid URL for Spectral's web app along with your access key are set in the plugin's settings first. If the issue persists afterwards and you're a ranked member of Spectral, contact the developer.";
 							}
 							else if (!coolDownFinished)
 							{
@@ -756,110 +690,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		return true;
 	}
 	
-	/*
-	// This method is a modified version of code provided by aHooder.
-	private void showCommand(ChatMessage chatMessage, String message)
-	{
-		// In case these commands are ever seen outside of the clan chat, don't replace the command text in the chat.
-		if (chatMessage.getType() != ChatMessageType.CLAN_CHAT)
-		{
-			return;
-		}
-		
-		if (config.memberKey().equals(""))
-		{
-			return;
-		}
-		
-		if (!validAccessKey)
-		{
-			return;
-		}
-		
-		MessageNode messageNode = chatMessage.getMessageNode();
-		
-		if (messageNode.getValue().trim().equalsIgnoreCase(COMMAND_RECRUIT) || messageNode.getValue().trim().equalsIgnoreCase(COMMAND_MOD))
-		{
-			final String sender = Text.removeTags(messageNode.getName());
-			int playerRank = getLocalPlayerRank(Optional.empty());
-			int senderRank = getLocalPlayerRank(Optional.of(sender));
-			
-			if (playerRank == 0 || senderRank == 0)
-			{
-				return;
-			}
-			
-			updateChat(messageNode);
-		}
-		else
-		{
-			return;
-		}
-	}
-	*/
-	
-	/*
-	protected void updateChat(MessageNode message)
-	{
-		String result = "";
-		
-		if (message.getValue().trim().equalsIgnoreCase(COMMAND_RECRUIT))
-		{
-			result = "I pinged the recruiters!";
-		}
-		else if (message.getValue().trim().equalsIgnoreCase(COMMAND_MOD))
-		{
-			result = "I pinged the mods!";
-		}
-		
-		final String cInput = result;
-		
-		String response = new ChatMessageBuilder()
-		.append(ChatColorType.NORMAL)
-		.append(cInput)
-		.build();
-		
-		message.setRuneLiteFormatMessage(response);
-		client.refreshChat();
-	}
-	*/
-	
-	@Subscribe
-	public void onChatMessage(ChatMessage chatMessage)
-	{
-		ChatMessageType msgType = chatMessage.getType();
-		
-		if (msgType != ChatMessageType.GAMEMESSAGE && msgType != ChatMessageType.SPAM)
-		{
-			return;
-		}
-		
-		final String msg = Text.removeTags(chatMessage.getMessage().trim());
-		final String playerName = client.getLocalPlayer().getName();
-		
-		if (!regexPattern.equals(""))
-		{
-			Pattern regex = Pattern.compile(regexPattern);
-			Matcher regexMatcher = regex.matcher(msg);
-			
-			if (regexMatcher.matches())
-			{
-				if (regexMatcher.groupCount() == 3)
-				{
-					// 0 = mox resin, 1 = aga resin, 2 = lye resin
-					int mox = Integer.parseInt(regexMatcher.group(1));
-					int aga = Integer.parseInt(regexMatcher.group(2));
-					int lye = Integer.parseInt(regexMatcher.group(3));
-					log.info("Game message matched. Mox resin value: " + String.valueOf(mox) + ", Aga resin value: " + String.valueOf(aga) + ", Lye resin value: " + String.valueOf(lye));
-				}
-				else
-				{
-					log.info("Group count isn't 3 for matched regex pattern.");
-				}
-			}
-		}
-	}
-	
 	// Checks if the string passed to the method is a valid URL. If it's missing, or it's not a valid URL, it'll return false
 	// so we can respond and block the execution from continuing before an HttpRequest is created.
 	protected static boolean checkURL(String URL)
@@ -893,7 +723,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			
 			if (rank != 0 && (normalRanks.contains(rank) || adminRanks.contains(rank)) && !reg)
 			{
-				return "reg-fail;Your player ID doesn't seem to be registered. If you're a ranked member of Spectral and you haven't registered your player ID, use the !addme command and follow the steps to do so first. If you've registered your player ID before, but you've changed your name since then, ask a Recruiter or Mod to export your name change. Wait for them to confirm they've exported it before turning the plugin off and on again. If the issue persists, contact the developer.";
+				return "reg-fail;Your player ID doesn't seem to be registered. If you're a ranked member of Spectral and you haven't registered your player ID, use the !addme command in the clan chat to do so first. If you've registered your player ID before, but you've changed your name since then, ask a Recruiter or Mod to export your name change. Wait for them to confirm they've exported it before turning the plugin off and on again. If the issue persists, contact the developer.";
 			}
 			
 			if (!checkURL(config.scriptURL()))
@@ -903,7 +733,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			
 			if (config.memberKey().equals(""))
 			{
-				return "key-fail;Your access key isn't set in the plugin's settings. If you're a ranked member of Spectral, use the !key command to get your access key first. If the issue persists after your access key is set, contact the developer.";
+				return "key-fail;Your access key isn't set in the plugin's settings. If you're a ranked member of Spectral and you've already registered your player ID, use the !key command in the clan chat to get your access key first. If the issue persists after your access key is set, contact the developer.";
 			}
 			
 			return "proceed";
@@ -916,7 +746,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			else
 			{
-				return httpRequest.getRequestAsyncPluginData(player, acctHash);
+				return httpRequest.getRequestAsyncPluginData(player, acctHash, rank);
 			}
 		})
 		.thenApplyAsync(res ->
@@ -925,7 +755,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			
 			if (result[0].equalsIgnoreCase("perma-fail") || result[0].equalsIgnoreCase("url-fail"))
 			{
-				competitionData = null;
 				canUseSpectralCommand = false;
 				canUseDiscordCommands = false;
 				validAccessKey = false;
@@ -935,20 +764,18 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			else if (result[0].equalsIgnoreCase("attempt-fail") || result[0].equalsIgnoreCase("reg-fail") || result[0].equalsIgnoreCase("key-fail"))
 			{
-				competitionData = null;
+				attemptCount = 5;
 				pluginLoaded = false;
 				ready = true;
 			}
 			else if (result[0].equalsIgnoreCase("failure"))
 			{
-				competitionData = null;
 				attemptCount = 5;
 				pluginLoaded = false;
 				ready = true;
 			}
 			else if (result[0].equalsIgnoreCase("resp-failure"))
 			{
-				competitionData = null;
 				attemptCount++;
 				
 				if (attemptCount < 5)
@@ -967,23 +794,10 @@ public class SpectralClanMgmtPlugin extends Plugin
 				attemptCount = 0;
 				pluginLoaded = true;
 				ready = true;
-				/*
-				if (competitionData != null)
-				{
-					competitionData.addProperty("playerName", player);
-					competitionData.addProperty("acctHash", acctHash);
-				}
-				*/
 			}
 			
 			commandProcessing = false;
 			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", result[1], null));
-			/*
-			if (competitionData != null)
-			{
-				clientThread.invokeLater(() -> setCompetition());
-			}
-			*/
 			return true;
 			
 		}).join();
@@ -1019,13 +833,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		stat = resp.get("status").getAsString();
 		JsonArray permission = resp.get("permission").getAsJsonArray();
-		//reg = resp.get("registered").getAsBoolean();
+		reg = resp.get("registered").getAsBoolean();
 		int downTime = resp.get("downTime").getAsInt();
 		validAccessKey = permission.get(0).getAsBoolean();
 		
-		// Replace the if statement with the one below once the new servers are ready
-		//if (validAccessKey && reg)
-		if (validAccessKey)
+		if (validAccessKey && reg)
 		{
 			canUseSpectralCommand = permission.get(1).getAsBoolean();
 			canUseDiscordCommands = permission.get(2).getAsBoolean();
@@ -1035,35 +847,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			coolDownTime = downTime;
 		}
-		
-		/* Uncomment once the new servers are ready
-		boolean isCompeting = resp.get("competing").getAsBoolean();
-		
-		if (validAccessKey && reg && isCompeting && competitionData == null && spectralCompetition == null)
-		{
-			String competitionID = resp.get("competitionID").getAsString();
-			String teamID = resp.get("teamID").getAsString();
-			String startDate = resp.get("startDate").getAsString();
-			String endDate = resp.get("endDate").getAsString();
-			Boolean startingXPSent = resp.get("startingXPSent").getAsBoolean();
-			
-			if (!competitionID.equals("") && !teamID.equals("") && !currentChallengeID.equals("") && startDate != 0)
-			{
-				competitionData = new JsonObject();
-				competitionData.addProperty("competitionID", competitionID);
-				competitionData.addProperty("teamID", teamID);
-				competitionData.addProperty("startDate", startDate);
-				competitionData.addProperty("endDate", endDate);
-				competitionData.addProperty("startingXPSent", startingXPSent);
-			}
-		}
-		else
-		{
-			competitionData = null;
-		}
-		*/
-		
-		regexPattern = resp.get("regexPattern").getAsString();
 		
 		String result = "";
 		
@@ -1075,25 +858,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			result = ";" + resp.get("reason").getAsString();
 		}
-		else if (stat.equalsIgnoreCase("reg-fail"))
-		{
-			result = ";Your player ID hasn't been registered. If you're a ranked member of Spectral, use the !addme command and follow the steps to register your player ID first. If the issue persists after your player ID has been registered, contact the developer.";
-		}
 		
 		return stat + result;
 	}
-	
-	/*
-	private void setCompetition()
-	{
-		if (spectralCompetition == null && competitionData != null)
-		{
-			spectralCompetition = new SpectralCompetition(eventBus, client, okHttpClient, gson, competitionData.deepCopy());
-		}
-		
-		competitionData = null;
-	}
-	*/
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin code and rewritten to fit this plugin's usage. 
 	// All credit for the original code goes to dekvall.
@@ -1107,15 +874,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (game == GameState.LOGIN_SCREEN)
 		{
-			/*
-			if (spectralCompetition != null)
-			{
-				spectralCompetition.shutdown();
-				spectralCompetition = null;
-				competitionData = null;
-			}
-			*/
-			
 			attemptCount = 0;
 			coolDown = -1;
 			coolDownFinished = true;
@@ -1126,6 +884,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			commandProcessing = false;
 			canUseSpectralCommand = false;
 			canUseDiscordCommands = false;
+			reg = true;
 		}
 		
 		if (game == GameState.LOGGED_IN)
@@ -1146,7 +905,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (!checkURL(config.scriptURL()))
 		{
-			msg = "The URL for Spectral's Web App is either missing or not valid. Contact the developer about this issue.";
+			msg = "A valid URL for Spectral's web app is not set in the plugin's settings. If the issue persists when there is a valid URL set, and you're a ranked member of Spectral, contact the developer.";
 			flag = true;
 		}
 		else if (config.memberKey().equals("") || !validAccessKey)
@@ -1163,7 +922,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		else
 		{
-			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncRecruitMod("discord", spectralCommand.getSpectralCommand(), player, spectralCommand.getAcctHash())
+			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncRecruitMod("discord", spectralCommand.getSpectralCommand(), player, spectralCommand.getAcctHash(), spectralCommand.getRank())
 			.thenApply(result ->
 			{
 				String[] results = result.split("\\;");
@@ -1221,14 +980,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (!checkURL(config.scriptURL()))
 		{
-			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The URL for Spectral's Discord App is either missing or not valid. If you're a ranked member of Spectral, contact the developer about this issue.", null));
+			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "A valid URL for Spectral's web app is not set in the plugin's settings. If the issue persists when there is a valid URL set, and you're a ranked member of Spectral, contact the developer.", null));
 			return false;
 		}
 		else
 		{
-			clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Spectral's bot will ping you in the clan's Discord server. You have 5 minutes to click the button in the post the bot pinged you in to confirm you initiated the request. Once confirmed, your player ID will be registered.", null));
+			clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Attempting to register your player ID...", null));
 			
-			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncRegisterPlayerID("addme", spectralCommand.getPlayer(), spectralCommand.getAcctHash())
+			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncRegisterPlayerID("addme", spectralCommand.getPlayer(), spectralCommand.getAcctHash(), spectralCommand.getRank())
 			.thenApply(result ->
 			{
 				String[] results = result.split("\\;");
@@ -1288,7 +1047,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (stat.equalsIgnoreCase("success") && config.memberKey().equals(""))
 		{
-			result = result + " You can use the !key command now to get your access key.";
+			result = result + " You can use the !key command in the clan chat now to get your access key.";
 		}
 		
 		if (reg && !config.memberKey().equals(""))
@@ -1303,12 +1062,14 @@ public class SpectralClanMgmtPlugin extends Plugin
 	{
 		if (!checkURL(config.scriptURL()))
 		{
-			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "The URL for Spectral's Web App is either missing or not valid. If you're a ranked member of Spectral, contact the developer about this issue.", null));
+			clientThread.invokeLater(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "A valid URL for Spectral's web app is not set in the plugin's settings. If the issue persists when there is a valid URL set, and you're a ranked member of Spectral, contact the developer.", null));
 			return false;
 		}
 		else
 		{
-			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncAccessKey("get-key", spectralCommand.getPlayer(), spectralCommand.getAcctHash())
+			clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Attempting to retrieve your access key...", null));
+			
+			CompletableFuture<Boolean> future = httpRequest.postRequestAsyncAccessKey("get-key", spectralCommand.getPlayer(), spectralCommand.getAcctHash(), spectralCommand.getRank())
 			.thenApply(result ->
 			{
 				String[] results = result.split("\\;");
@@ -1378,7 +1139,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			}
 			else
 			{
-				config.setMemberKey("");
 				ready = true;
 				validAccessKey = false;
 				result = stat + ";Something went wrong during the access key request. If you're a ranked member of Spectral, contact the developer about this issue.";
@@ -1386,7 +1146,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		}
 		else
 		{
-			config.setMemberKey("");
 			ready = true;
 			result = stat + ";" + dat;
 			validAccessKey = false;

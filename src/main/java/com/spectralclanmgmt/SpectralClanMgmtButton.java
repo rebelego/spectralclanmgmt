@@ -161,6 +161,8 @@ public class SpectralClanMgmtButton
 	}
 	// **
 	
+	// This method deals with the issues that come up when the user clicks the button
+	// and then clicks to filter or search without canceling first.
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired scriptPreFired)
 	{
@@ -919,7 +921,7 @@ public class SpectralClanMgmtButton
 	{
 		if (!response.isSuccessful())
 		{
-			return "Something went wrong.<br>Export could n't be completed.";
+			return "Something went wrong.<br>Export couldn't be completed.";
 		}
 		
 		JsonObject resp;
@@ -945,14 +947,7 @@ public class SpectralClanMgmtButton
 		
 		if (stat.equalsIgnoreCase("success"))
 		{
-			if (task.equalsIgnoreCase("add-new"))
-			{
-				res = res + "<br>Now open Discord and wait for Spectral's bot to ping you.";
-			}
-			else
-			{
-				res = res + "<br>All done!";
-			}
+			res = res + "<br>All done!";
 		}
 		
 		return res;
@@ -1048,7 +1043,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Select the new Main member's name from the left column.<br>Or click cancel to exit.")
+		.openTextMenuInput("Select the new Main member's name from the left column.<br>Or click Cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build(2);
 	}
@@ -1073,7 +1068,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Select the new Alt member's name from the left column.<br>Or click cancel to exit.")
+		.openTextMenuInput("Select the new Alt member's name from the left column.<br>Or click Cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build(2);
 	}
@@ -1093,7 +1088,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Select the Main's name for the new Alt from the left column.<br>Or click cancel to exit.")
+		.openTextMenuInput("Select the Main's name for the new Alt from the left column.<br>Or click Cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build(2);
 	}
@@ -1164,7 +1159,7 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Select a member from the left column for the name change export.<br>Or click cancel to exit.")
+		.openTextMenuInput("Select a member from the left column for the name change export.<br>Or click Cancel to exit.")
 		.option("Cancel", () -> removeListeners())
 		.build(2);
 	}
@@ -1190,11 +1185,11 @@ public class SpectralClanMgmtButton
 		chatboxPanelManager.close();
 		
 		chatboxPanelManager
-		.openTextMenuInput("Is the member you intend to select on your Friends list?")
+		.openTextMenuInput("Is the member you intend to select on your Friends list?<br>Please note that you can't export your own name change.")
 		.option("Yes", () -> selectNameChange())
 		.option("No", () -> abortNameChange())
 		.option("Cancel", () -> cancelOptions())
-		.build(1);
+		.build(2);
 	}
 	
 	private void newMemberExport()
@@ -1251,7 +1246,7 @@ public class SpectralClanMgmtButton
 						
 						chatboxPanelManager
 						.openTextMenuInput("Select an export option below, or click Cancel to exit.")
-						.option("New Member", () -> newMemberExport())
+						.option("Add Member", () -> newMemberExport())
 						.option("Name Change", () -> nameChangeCheckPreReq())
 						.option("Rank Swap", () -> selectOldMain())
 						.option("Cancel", () -> cancelOptions())
@@ -1269,7 +1264,7 @@ public class SpectralClanMgmtButton
 					}
 					else if (!plugin.reg)
 					{
-						errorMsg = "Your player ID isn't registered. Use the !addme command and<br>follow the steps to register your player ID first before trying again.";
+						errorMsg = "Your player ID isn't registered. Use the !addme command<br>to register your player ID first before trying again.";
 					}
 					else if (adminRank == 0 || !SpectralClanMgmtPlugin.adminRanks.contains(adminRank))
 					{
@@ -1277,7 +1272,7 @@ public class SpectralClanMgmtButton
 					}
 					else if (!SpectralClanMgmtPlugin.checkURL(config.scriptURL()))
 					{
-						errorMsg = "The URL for Spectral's server isn't valid. If the URL is valid and<br>you continue to get this message, contact the developer.";
+						errorMsg = "The URL for Spectral's web app isn't valid. If the URL is valid and<br>you continue to get this message, contact the developer.";
 					}
 					else if (!httpRequest.getIsReady())
 					{

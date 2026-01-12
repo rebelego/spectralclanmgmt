@@ -30,7 +30,7 @@ public class SpectralClanMgmtHttpRequest
 		this.plugin = plugin;
 		this.config = config;
 		this.client = client;
-		this.httpclient = okHttpClient.newBuilder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(6, TimeUnit.MINUTES).build();
+		this.httpclient = okHttpClient.newBuilder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(1, TimeUnit.MINUTES).build();
 		this.button = null;
 	}
 	
@@ -39,22 +39,22 @@ public class SpectralClanMgmtHttpRequest
 		this.button = button;
 	}
 	
-	protected String getRequestAsyncPluginData(String player, String acctHash)
+	protected String getRequestAsyncPluginData(String player, String acctHash, int rank)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		HttpUrl url = HttpUrl.parse(config.scriptURL()).newBuilder()
-		//.addQueryParameter("task", "getPluginData")
+		.addQueryParameter("task", "getData")
 		.addQueryParameter("player", player)
 		.addQueryParameter("acctHash", acctHash)
 		.addQueryParameter("accessKey", config.memberKey())
-		.addQueryParameter("configLink", "both") //This will be removed when the new servers are set up.
+		.addQueryParameter("rank", String.valueOf(rank))
 		.build();
 		
 		Request request = new Request.Builder()
-									 .url(url.toString())
-									 .get()
-									 .build();
+		.url(url.toString())
+		.get()
+		.build();
 		
 		httpclient.newCall(request).enqueue(new Callback()
 		{
@@ -136,10 +136,10 @@ public class SpectralClanMgmtHttpRequest
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
 		Request request = new Request.Builder()
-									 .url(admin)
-									 .post(body)
-									 .addHeader("Content-Type", "application/json")
-									 .build();
+		.url(admin)
+		.post(body)
+		.addHeader("Content-Type", "application/json")
+		.build();
 		
 		httpclient.newCall(request).enqueue(new Callback()
 		{
@@ -176,14 +176,14 @@ public class SpectralClanMgmtHttpRequest
 	/*
 	This is the postRequestAsync method for the Discord-related commands.
 	*/
-	protected CompletableFuture<String> postRequestAsyncRecruitMod(String task, String spectralCommand, String player, String acctHash)
+	protected CompletableFuture<String> postRequestAsyncRecruitMod(String task, String spectralCommand, String player, String acctHash, int rank)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		// URL of the web app for the script.
-		HttpUrl url = HttpUrl.parse(config.scriptURL() + "/discord");
+		HttpUrl url = HttpUrl.parse(config.scriptURL());
 		String command = spectralCommand.substring(1);
-		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"accessKey\":\"" + config.memberKey() + "\",\"acctHash\":\"" + acctHash + "\"}";
+		String payload = "{\"task\":\"" + task + "\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"accessKey\":\"" + config.memberKey() + "\",\"acctHash\":\"" + acctHash + "\",\"rank\":\"" + String.valueOf(rank) + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
@@ -228,12 +228,12 @@ public class SpectralClanMgmtHttpRequest
 	/*
 	This is the postRequestAsync method for retrieving a member's access key.
 	*/
-	protected CompletableFuture<String> postRequestAsyncAccessKey(String task, String player, String acctHash)
+	protected CompletableFuture<String> postRequestAsyncAccessKey(String task, String player, String acctHash, int rank)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		HttpUrl url = HttpUrl.parse(config.scriptURL());
-		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\"}";
+		String payload = "{\"task\":\"" + task + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\",\"rank\":\"" + String.valueOf(rank) + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
@@ -275,12 +275,12 @@ public class SpectralClanMgmtHttpRequest
 		return respBody;
 	}
 	
-	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String command, String player, String acctHash)
+	protected CompletableFuture<String> postRequestAsyncRegisterPlayerID(String command, String player, String acctHash, int rank)
 	{
 		CompletableFuture<String> respBody = new CompletableFuture<>();
 		
 		HttpUrl url = HttpUrl.parse(config.scriptURL());
-		String payload = "{\"task\":\"discord\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\"}";
+		String payload = "{\"task\":\"register\",\"command\":\"" + command + "\",\"player\":\"" + player + "\",\"acctHash\":\"" + acctHash + "\",\"rank\":\"" + String.valueOf(rank) + "\"}";
 		
 		RequestBody body = RequestBody.create(MediaType.parse("application/json"), payload);
 		
