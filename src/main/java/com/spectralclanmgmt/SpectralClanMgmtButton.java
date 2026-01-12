@@ -913,7 +913,7 @@ public class SpectralClanMgmtButton
 		
 		String admin = client.getLocalPlayer().getName().replace('\u00A0', ' ');
 		
-		if (!config.memberKey().equals("") && plugin.validAccessKey && plugin.reg && plugin.checkURL(config.scriptURL()))
+		if (!config.memberKey().equals("") && plugin.validAccessKey && plugin.reg && plugin.checkURL(plugin.getAdminURL()))
 		{
 			if (httpRequest.getIsReady())
 			{
@@ -950,9 +950,9 @@ public class SpectralClanMgmtButton
 			{
 				errorMsg = "Your player ID doesn't seem to be registered. If you've registered but recently changed your name,<br>ask another Recruiter+ to export your name change first. Once they have, turn the plugin off and on again.<br>If the issue persists, contact the developer.";
 			}
-			else if (!plugin.checkURL(config.scriptURL()))
+			else if (!plugin.checkURL(plugin.getAdminURL()))
 			{
-				errorMsg = "A valid URL for Spectral's web app isn't set in the plugin's settings.<br>Set the URL in the plugin's settings before trying again.<br>If the issue persists when there is a valid URL set, contact the developer.";
+				errorMsg = "A valid URL for Spectral's Admin web app isn't set. If you have an admin rank,<br>a valid access key, and you've registered your player ID, try turning the plugin<br>off and on again to fix the issue. If the issue persists, contact the developer.";
 			}
 			
 			chatboxPanelManager
@@ -1340,7 +1340,7 @@ public class SpectralClanMgmtButton
 					}
 				}
 				
-				if (!config.memberKey().equals("") && plugin.validAccessKey && plugin.reg && adminRank != 0 && SpectralClanMgmtPlugin.adminRanks.contains(adminRank) && SpectralClanMgmtPlugin.checkURL(config.scriptURL()) && httpRequest.getIsReady())
+				if (!config.memberKey().equals("") && plugin.validAccessKey && plugin.reg && adminRank != 0 && SpectralClanMgmtPlugin.adminRanks.contains(adminRank) && SpectralClanMgmtPlugin.checkURL(plugin.getAdminURL()) && httpRequest.getIsReady())
 				{
 					// wasClicked is used as a flag that stops the button from reacting to additional clicks
 					// after the first click until the admin either finishes an export, cancels, or causes the members list widget to close.
@@ -1367,19 +1367,19 @@ public class SpectralClanMgmtButton
 					
 					if (config.memberKey().equals("") || !plugin.validAccessKey)
 					{
-						errorMsg = "A valid access key isn't set in the plugin's settings.<br>Use the !key command to get the access key first.";
+						errorMsg = "A valid access key isn't set in the plugin's settings. Use the !key command<br>in the clan chat to get your access key first before trying again.";
 					}
 					else if (!plugin.reg)
 					{
-						errorMsg = "Your player ID isn't registered. Use the !addme command<br>to register your player ID first before trying again.";
+						errorMsg = "Your player ID isn't registered. Use the !addme command in the clan chat<br>to register your player ID first before trying again.";
 					}
 					else if (adminRank == 0 || !SpectralClanMgmtPlugin.adminRanks.contains(adminRank))
 					{
 						errorMsg = "You don't have the required rank to use this feature.<br>Contact the developer if you are an admin member of Spectral.";
 					}
-					else if (!SpectralClanMgmtPlugin.checkURL(config.scriptURL()))
+					else if (!SpectralClanMgmtPlugin.checkURL(plugin.getAdminURL()))
 					{
-						errorMsg = "The URL for Spectral's web app isn't valid. If the URL is valid and<br>you continue to get this message, contact the developer.";
+						errorMsg = "The URL for Spectral's Admin web app isn't valid. Try turning the plugin<br>off and on again to fix the issue. If this issue persists, contact the developer.";
 					}
 					else if (!httpRequest.getIsReady())
 					{

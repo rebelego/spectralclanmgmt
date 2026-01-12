@@ -133,7 +133,7 @@ public class SpectralClanMgmtHttpRequest
 			arg2 = "mainPlayer";
 		}
 		
-		HttpUrl admin = HttpUrl.parse(config.scriptURL());
+		HttpUrl admin = HttpUrl.parse(plugin.getAdminURL());
 		
 		String payload = "{\"" + arg1 + "\":\"" + task + "\",\"" + arg2 + "\":\"" + firstArg + "\",\"" + arg3 + "\":\"" + secondArg + "\",\"" + arg4 + "\":\"" + thirdArg + "\",\"" + arg5 + "\":\"" + adminPlayer + "\",\"" + arg6 + "\":\"" + config.memberKey() + "\",\"" + arg7 + "\":\"" + acctHash + "\",\"" + arg8 + "\":\"" + adminRank + "\"}";
 		

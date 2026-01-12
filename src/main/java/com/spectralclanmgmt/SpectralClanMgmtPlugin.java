@@ -86,6 +86,9 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	private static final int CLAN_SETTINGS_MEMBERS_INTERFACE_HEADER = 45416450;
 	
+	@Getter
+	private String adminURL = "";
+	
 	private boolean canUseDiscordCommands;
 	private boolean canUseSpectralCommand;
 	
@@ -211,6 +214,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		coolDownFinished = true;
 		gameTickCount = 0;
 		firstGameTick = false;
+		adminURL = "";
 		canUseSpectralCommand = false;
 		canUseDiscordCommands = false;
 		validAccessKey = false;
@@ -844,6 +848,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		reg = resp.get("registered").getAsBoolean();
 		int downTime = resp.get("downTime").getAsInt();
 		validAccessKey = permission.get(0).getAsBoolean();
+		adminURL = resp.get("admin").getAsString();
 		canUseSpectralCommand = permission.get(1).getAsBoolean();
 		canUseDiscordCommands = permission.get(2).getAsBoolean();
 		
@@ -886,6 +891,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 			ready = false;
 			pluginLoaded = false;
 			commandProcessing = false;
+			adminURL = "";
 			canUseSpectralCommand = false;
 			canUseDiscordCommands = false;
 			reg = true;
@@ -1012,6 +1018,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	protected String updateRegistered(Response response) throws IOException
 	{
+		reg = false;
+		
 		if (!response.isSuccessful())
 		{
 			return "failure;An error occurred. The request either wasn't received or it wasn't accepted.";
@@ -1035,21 +1043,20 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		String stat = resp.get("status").getAsString();
 		String dat = resp.get("data").getAsString();
+		reg = resp.get("registered").getAsBoolean();
 		String result = stat + ";" + dat;
 		
 		if (stat.equalsIgnoreCase("success"))
 		{
-			reg = true;
 			pluginLoaded = false;
 		}
 		else
 		{
-			reg = false;
 			pluginLoaded = false;
 			ready = true;
 		}
 		
-		if (stat.equalsIgnoreCase("success") && config.memberKey().equals(""))
+		if (reg && config.memberKey().equals(""))
 		{
 			result = result + " You can use the !key command in the clan chat now to get your access key.";
 		}
@@ -1094,6 +1101,8 @@ public class SpectralClanMgmtPlugin extends Plugin
 	
 	protected String setAccessKey(Response response) throws IOException
 	{
+		validAccessKey = false;
+		
 		if (!response.isSuccessful())
 		{
 			return "failure;An error occurred. The request either wasn't received or it wasn't accepted.";
@@ -1115,7 +1124,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		if (resp == null)
 		{
-			validAccessKey = false;
 			stat = "failure";
 			dat = "Something went wrong and your access key couldn't be found. If you're a ranked member of Spectral, contact the developer about this issue.";
 		}
@@ -1123,6 +1131,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			stat = resp.get("status").getAsString();
 			dat = resp.get("data").getAsString();
+			validAccessKey = resp.get("isValid").getAsBoolean();
 		}
 		
 		String result = "";
@@ -1138,13 +1147,12 @@ public class SpectralClanMgmtPlugin extends Plugin
 					ready = false;
 				}
 				
-				validAccessKey = true;
 				result = stat + ";Your access key was set.";
 			}
 			else
 			{
-				ready = true;
 				validAccessKey = false;
+				ready = true;
 				result = stat + ";Something went wrong during the access key request. If you're a ranked member of Spectral, contact the developer about this issue.";
 			}
 		}
@@ -1152,7 +1160,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		{
 			ready = true;
 			result = stat + ";" + dat;
-			validAccessKey = false;
 		}
 		
 		return result;
