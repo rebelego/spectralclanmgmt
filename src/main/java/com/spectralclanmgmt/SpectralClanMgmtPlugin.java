@@ -99,15 +99,11 @@ public class SpectralClanMgmtPlugin extends Plugin
 	private boolean commandProcessing;
 	
 	private boolean memberWidgetLoaded;
-	
-	private boolean firstGameTick;
 
 	// Controls how many times an http request will be resent if 
 	// a previous request failed to receive a response.
 	// Up to 5 attempts can be made after a failed request.
 	private int attemptCount;
-	
-	private int gameTickCount;
 	
 	// They'll need to wait a certain amount of time after they use one of spectral's command before they can use one again.
 	private int coolDown;
@@ -212,8 +208,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 		attemptCount = 0;
 		coolDown = -1;
 		coolDownFinished = true;
-		gameTickCount = 0;
-		firstGameTick = false;
 		adminURL = "";
 		canUseSpectralCommand = false;
 		canUseDiscordCommands = false;
@@ -886,8 +880,6 @@ public class SpectralClanMgmtPlugin extends Plugin
 			attemptCount = 0;
 			coolDown = -1;
 			coolDownFinished = true;
-			firstGameTick = false;
-			gameTickCount = 0;
 			ready = false;
 			pluginLoaded = false;
 			commandProcessing = false;
