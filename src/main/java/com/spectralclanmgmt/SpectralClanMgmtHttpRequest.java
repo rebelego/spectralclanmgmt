@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import java.io.*;
 import java.util.concurrent.*;
-
 import okhttp3.*;
 import javax.inject.Inject;
 
