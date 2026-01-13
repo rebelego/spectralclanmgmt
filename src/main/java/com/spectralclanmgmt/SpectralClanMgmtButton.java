@@ -647,7 +647,7 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText());
 					ClanMember selectedMember = clanmembers.get(widgetText);
 							
 					if (selectedMember != null)
@@ -995,11 +995,6 @@ public class SpectralClanMgmtButton
 		stat = resp.get("status").getAsString();
 		res = resp.get("data").getAsString();
 		
-		if (stat.equalsIgnoreCase("success"))
-		{
-			res = res + "<br>All done!";
-		}
-		
 		return res;
 	}
 	
@@ -1281,6 +1276,18 @@ public class SpectralClanMgmtButton
 		.build(2);
 	}
 	
+	private void rankSwapOrDiscordChange()
+	{
+		chatboxPanelManager.close();
+		
+		chatboxPanelManager
+		.openTextMenuInput("Rank Swap or Discord Deserter/Returnee?")
+		.option("Rank Swap", () -> selectOldMain())
+		.option("Discord Deserter/Returnee", () -> discordMemberChange())
+		.option("Cancel", () -> cancelOptions())
+		.build(2);
+	}
+	
 	// A check prompt for the admin to confirm the prerequisite condition, the clan member being on their Friends list, is met.
 	// An admin will need to add the clan member that changed their name to their Friends list first (they're aware of this)
 	// before they can export the clan member's current and previous name to the script that will update the spreadsheet pages.
@@ -1354,8 +1361,7 @@ public class SpectralClanMgmtButton
 						.openTextMenuInput("Select an export option below, or click Cancel to exit.")
 						.option("Add Member", () -> newMemberExport())
 						.option("Name Change", () -> nameChangeCheckPreReq())
-						.option("Rank Swap", () -> selectOldMain())
-						.option("Discord Deserter or Returnee", () -> discordMemberChange())
+						.option("Rank Swap or Discord Deserter/Returnee", () -> rankSwapOrDiscordChange())
 						.option("Cancel", () -> cancelOptions())
 						.build(1);
 					}
