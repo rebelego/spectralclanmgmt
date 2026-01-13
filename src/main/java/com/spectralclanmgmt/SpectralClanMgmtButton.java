@@ -254,7 +254,7 @@ public class SpectralClanMgmtButton
 				{
 					// With the slot number, we get the selected member's name, 
 					// and with the member's name we get their join date and store it in these variables for later.
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedNewMember = clanmembers.get(widgetText);
 					String selectedNewMemberDate = "";
 					
@@ -314,7 +314,7 @@ public class SpectralClanMgmtButton
 				// We're getting the new alt member here
 				if (!firstMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedNewMember = clanmembers.get(widgetText);
 					String selectedNewMemberDate = "";
 					
@@ -373,7 +373,7 @@ public class SpectralClanMgmtButton
 				if (firstMemberSelected && !secondMemberSelected)
 				{
 					// For the Alt's Main, we only need its name.
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedMainMember = clanmembers.get(widgetText);
 					
 					if (selectedMainMember != null)
@@ -429,7 +429,7 @@ public class SpectralClanMgmtButton
 				if (!firstMemberSelected)
 				{
 					// For selecting a name change, we only want to get the current name and store it in a local variable.
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedChangedMember = clanmembers.get(widgetText);
 					
 					if (selectedChangedMember != null)
@@ -541,7 +541,7 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedOldMainMember = clanmembers.get(widgetText);
 					
 					if (selectedOldMainMember != null)
@@ -590,7 +590,7 @@ public class SpectralClanMgmtButton
 			{
 				if (firstMemberSelected && !secondMemberSelected)
 				{
-					widgetText = client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' ');
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedOldAltMember = clanmembers.get(widgetText);
 					
 					if (selectedOldAltMember != null)
@@ -647,7 +647,7 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText());
+					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedMember = clanmembers.get(widgetText);
 							
 					if (selectedMember != null)
