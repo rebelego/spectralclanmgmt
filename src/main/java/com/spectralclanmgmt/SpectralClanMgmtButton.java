@@ -252,8 +252,6 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					// With the slot number, we get the selected member's name, 
-					// and with the member's name we get their join date and store it in these variables for later.
 					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedNewMember = clanmembers.get(widgetText);
 					String selectedNewMemberDate = "";
@@ -335,6 +333,7 @@ public class SpectralClanMgmtButton
 							firstMemberSelected = true;
 							firstMemberName = widgetText;
 							firstMemberDate = selectedNewMemberDate;
+							playerRank = String.valueOf(memberRank);
 							confirmSelection();
 							return;
 						}
@@ -361,6 +360,7 @@ public class SpectralClanMgmtButton
 						
 						firstMemberSelected = false;
 						firstMemberDate = "";
+						playerRank = "";
 						// Proceed to the next step.
 						displayError();
 						return;
@@ -419,6 +419,7 @@ public class SpectralClanMgmtButton
 						}
 						
 						secondMemberSelected = false;
+						playerRank = "";
 						displayError();
 						return;
 					}
@@ -428,7 +429,6 @@ public class SpectralClanMgmtButton
 			{
 				if (!firstMemberSelected)
 				{
-					// For selecting a name change, we only want to get the current name and store it in a local variable.
 					widgetText = Text.removeTags(client.getWidget(693, 10).getChild(j).getText().replace('\u00A0', ' '));
 					ClanMember selectedChangedMember = clanmembers.get(widgetText);
 					
@@ -555,6 +555,7 @@ public class SpectralClanMgmtButton
 						{
 							firstMemberSelected = true;
 							firstMemberName = widgetText;
+							playerRank = String.valueOf(memberRank);
 							confirmSelection();
 							return;
 						}
@@ -580,6 +581,7 @@ public class SpectralClanMgmtButton
 						}
 						
 						firstMemberSelected = false;
+						playerRank = "";
 						// Proceed to the next step.
 						displayError();
 						return;
@@ -615,7 +617,7 @@ public class SpectralClanMgmtButton
 								task = "rank-swap";
 								secondMemberSelected = true;
 								secondMemberName = widgetText;
-								playerRank = String.valueOf(memberRank);
+								playerRank = playerRank + ";" + String.valueOf(memberRank);
 								confirmSelection();
 								return;
 							}
@@ -704,7 +706,7 @@ public class SpectralClanMgmtButton
 		{
 			chatboxPanelManager
 			.openTextMenuInput("You've selected '" + secondMemberName + "' as the Main. Is this correct?<br>Click Yes to export the data, No to reselect the Main, or Cancel to exit.")
-			.option("Yes", () -> exportChange(task, firstMemberDate, secondMemberName, firstMemberName))
+			.option("Yes", () -> exportChange(task, firstMemberDate, secondMemberName + ";" + firstMemberName, playerRank))
 			.option("No", () -> selectMain())
 			.option("Cancel", () -> removeListeners())
 			.build(2);
@@ -1109,6 +1111,7 @@ public class SpectralClanMgmtButton
 		firstMemberSelected = false;
 		firstMemberName = "";
 		firstMemberDate = "";
+		playerRank = "";
 		
 		chatboxPanelManager.close();
 		

@@ -112,8 +112,8 @@ public class SpectralClanMgmtHttpRequest
 		else if (task.equalsIgnoreCase("add-alt"))
 		{
 			arg2 = "joinDate";
-			arg3 = "mainPlayer";
-			arg4 = "altPlayer";
+			arg3 = "mainAndAlt";
+			arg4 = "altPlayerRank";
 		}
 		else if (task.equalsIgnoreCase("name-change"))
 		{
@@ -125,7 +125,7 @@ public class SpectralClanMgmtHttpRequest
 		{
 			arg2 = "oldMain";
 			arg3 = "newMain";
-			arg4 = "rank";
+			arg4 = "ranks";
 		}
 		else if (task.equalsIgnoreCase("discord-deserter") || task.equalsIgnoreCase("discord-returnee"))
 		{
