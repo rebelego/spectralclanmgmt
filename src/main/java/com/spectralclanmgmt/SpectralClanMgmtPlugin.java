@@ -352,7 +352,7 @@ public class SpectralClanMgmtPlugin extends Plugin
 		
 		clanSettings = client.getClanSettings(0);
 		
-		if (clanSettings == null || !clanSettings.getName().equals("Spectral") || clanSettings.getMembers().isEmpty())
+		if (clanSettings == null || (clanSettings != null && !clanSettings.getName().equals("Spectral")) || (clanSettings != null && clanSettings.getMembers().isEmpty()))
 		{
 			return;
 		}

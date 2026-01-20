@@ -55,7 +55,7 @@ public class SpectralClanMgmtButton
 		this.config = config;
 		this.client = client;
 		this.textWidget = null;
-		this.buttonCreated = false;
+		buttonCreated = false;
 		task = "";
 		firstMemberName = "";
 		firstMemberDate = "";
@@ -84,7 +84,7 @@ public class SpectralClanMgmtButton
 		this.textWidget = this.createWidgetWithText();
 		// **
 		
-		this.buttonCreated = true;
+		buttonCreated = true;
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin and modified. 
@@ -137,12 +137,12 @@ public class SpectralClanMgmtButton
 		listenersSet = false;
 		clanmembers.clear();
 		this.textWidget = null;
-		this.buttonCreated = false;
+		buttonCreated = false;
 	}
 	
 	protected boolean isButtonCreated()
 	{
-		return this.buttonCreated;
+		return buttonCreated;
 	}
 	
 	// ** This method was copied from the Wise Old Man Runelite Plugin code and modified. 
@@ -166,7 +166,7 @@ public class SpectralClanMgmtButton
 	@Subscribe
 	public void onScriptPreFired(ScriptPreFired scriptPreFired)
 	{
-		if (this.buttonCreated)
+		if (buttonCreated)
 		{
 			if (scriptPreFired.getScriptId() == 4249 || scriptPreFired.getScriptId() == 4243)
 			{
@@ -1156,6 +1156,7 @@ public class SpectralClanMgmtButton
 		task = "rank-swap-old";
 		firstMemberSelected = false;
 		firstMemberName = "";
+		playerRank = "";
 		
 		chatboxPanelManager.close();
 		
@@ -1176,7 +1177,6 @@ public class SpectralClanMgmtButton
 		task = "rank-swap-new";
 		secondMemberSelected = false;
 		secondMemberName = "";
-		playerRank = "";
 		
 		chatboxPanelManager.close();
 		
